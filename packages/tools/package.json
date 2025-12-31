@@ -1,0 +1,12 @@
+{
+  "name": "@yt-assistant/tools",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.47.10",
+    "zod": "^3.24.1"
+  }
+}
+

@@ -1,0 +1,30 @@
+# YouTube Production Assistant - Media Worker Dependencies
+
+# Database
+psycopg2-binary==2.9.9
+supabase==2.9.1
+
+# Video Processing
+moviepy==1.0.3
+ffmpeg-python==0.2.0
+
+# Audio Analysis
+webrtcvad==2.0.10
+pydub==0.25.1
+librosa==0.10.1
+
+# Transcription
+openai-whisper==20231117
+
+# Face/Pose Analysis
+mediapipe==0.10.9
+opencv-python==4.9.0.80
+numpy==1.26.3
+Pillow==10.2.0
+
+# HTTP
+httpx==0.27.0
+
+# Utilities
+python-dotenv==1.0.0
+

@@ -1,0 +1,65 @@
+/**
+ * Database Migration Runner
+ * 
+ * Usage: npx tsx supabase/run-migrations.ts
+ * 
+ * Requires DATABASE_URL environment variable
+ */
+
+import { readFileSync, readdirSync } from "fs";
+import { join } from "path";
+import pg from "pg";
+
+const { Client } = pg;
+
+async function runMigrations() {
+  const databaseUrl = process.env.DATABASE_URL;
+  
+  if (!databaseUrl) {
+    console.error("ERROR: DATABASE_URL environment variable is required");
+    process.exit(1);
+  }
+
+  const client = new Client({
+    connectionString: databaseUrl,
+    ssl: false, // Disable SSL for direct VPS connection
+  });
+
+  try {
+    console.log("Connecting to database...");
+    await client.connect();
+    console.log("Connected successfully!\n");
+
+    // Get migration files
+    const migrationsDir = join(process.cwd(), "supabase", "migrations");
+    const files = readdirSync(migrationsDir)
+      .filter((f) => f.endsWith(".sql"))
+      .sort();
+
+    console.log(`Found ${files.length} migration file(s)\n`);
+
+    for (const file of files) {
+      console.log(`Running migration: ${file}`);
+      const sql = readFileSync(join(migrationsDir, file), "utf-8");
+      
+      try {
+        await client.query(sql);
+        console.log(`  ✓ ${file} completed\n`);
+      } catch (error) {
+        console.error(`  ✗ ${file} failed:`);
+        console.error(`    ${(error as Error).message}\n`);
+        // Continue with other migrations
+      }
+    }
+
+    console.log("Migration run complete!");
+  } catch (error) {
+    console.error("Database connection failed:", error);
+    process.exit(1);
+  } finally {
+    await client.end();
+  }
+}
+
+runMigrations();
+
