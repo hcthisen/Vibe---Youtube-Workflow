@@ -19,6 +19,15 @@ RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
 # Rebuild the source code only when needed
 FROM base AS builder
 WORKDIR /app
+
+# Declare build-time arguments for Next.js public env vars
+ARG NEXT_PUBLIC_SUPABASE_URL
+ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+# Set them as environment variables so Next.js can embed them in the build
+ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
+ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
+
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/package.json ./package.json
 COPY --from=deps /app/package-lock.json* ./package-lock.json*
