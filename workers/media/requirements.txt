@@ -4,8 +4,7 @@
 psycopg2-binary==2.9.9
 supabase==2.9.1
 
-# Video Processing
-moviepy==1.0.3
+# Video Processing (using ffmpeg directly via subprocess - moviepy not needed)
 ffmpeg-python==0.2.0
 
 # Audio Analysis
@@ -17,9 +16,8 @@ librosa==0.10.1
 torch==2.1.2
 torchaudio==2.1.2
 
-# Transcription
+# Transcription (using openai-whisper only - simpler, no native deps)
 openai-whisper==20231117
-faster-whisper==1.0.0
 
 # LLM for retake analysis
 openai==1.12.0
