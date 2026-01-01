@@ -39,6 +39,21 @@ services:
       timeout: 10s
       retries: 3
 
+  search-worker:
+    build:
+      context: .
+      dockerfile: workers/search-processor/Dockerfile
+    environment:
+      - NODE_ENV=production
+    env_file:
+      - .env.production
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "worker.ts"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   migrate:
     build:
       context: .

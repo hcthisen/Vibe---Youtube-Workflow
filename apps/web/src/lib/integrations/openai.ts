@@ -185,12 +185,22 @@ class OpenAIClient {
       }
     }
 
+    // Try to find JSON object in the response (handles extra text before/after)
+    const jsonObjectMatch = response.match(/\{[\s\S]*\}/);
+    if (jsonObjectMatch) {
+      try {
+        return JSON.parse(jsonObjectMatch[0]);
+      } catch (e) {
+        // Continue to next attempt
+      }
+    }
+
     // Try direct parse
     try {
-      return JSON.parse(response);
+      return JSON.parse(response.trim());
     } catch (e) {
       // Include a sample of the response to help debug
-      const sample = response.substring(0, 200);
+      const sample = response.substring(0, 300).replace(/\n/g, ' ');
       throw new Error(`Failed to parse JSON response from OpenAI. Response sample: ${sample}...`);
     }
   }
@@ -340,7 +350,12 @@ Respond with JSON: { "title_variants": [...] }`;
   async generateBaselineSummary(params: GenerateSummaryParams): Promise<GenerateSummaryResult> {
     try {
       const systemPrompt = `You are analyzing a YouTube channel's content to understand their niche.
-You must respond ONLY with valid JSON. Do not include any markdown formatting, explanations, or text outside the JSON object.`;
+You must respond ONLY with valid JSON. Do not include any markdown formatting, explanations, or text outside the JSON object.
+
+IMPORTANT: Your response must be EXACTLY in this format:
+{"summary": "your summary text here", "keywords": ["keyword1", "keyword2", "keyword3"]}
+
+Do not wrap it in markdown code blocks. Do not add any text before or after the JSON.`;
 
       // Build video content for analysis (transcripts if available, otherwise titles)
       const videoContent = params.videos
@@ -361,18 +376,24 @@ Based on the video titles and transcripts above, provide:
 1. A concise summary (2-3 sentences) describing this creator's niche, content style, and target audience
 2. 5-10 keywords that best describe their content themes and topics
 
-Your response must be ONLY this JSON format (no markdown, no extra text):
-{ "summary": "...", "keywords": ["keyword1", "keyword2", ...] }`;
+Respond with ONLY this exact JSON structure:
+{"summary": "your summary here", "keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"]}`;
 
+      // Use GPT-4 for more reliable JSON output (GPT-5 is still experimental)
       const response = await this.chat(
         [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        { model: this.fastModel, temperature: 0.3 }
+        { model: "gpt-4o", temperature: 0.3, maxTokens: 1000 }
       );
 
       const parsed = this.parseJsonResponse<{ summary: string; keywords: string[] }>(response);
+
+      // Validate the parsed response
+      if (!parsed.summary || !Array.isArray(parsed.keywords)) {
+        throw new Error("Invalid response structure: missing summary or keywords");
+      }
 
       return {
         success: true,

@@ -13,8 +13,16 @@ webrtcvad==2.0.10
 pydub==0.25.1
 librosa==0.10.1
 
+# Silero VAD (Neural Voice Activity Detection)
+torch==2.1.2
+torchaudio==2.1.2
+
 # Transcription
 openai-whisper==20231117
+faster-whisper==1.0.0
+
+# LLM for retake analysis
+openai==1.12.0
 
 # Face/Pose Analysis
 mediapipe==0.10.9

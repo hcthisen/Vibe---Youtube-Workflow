@@ -6,7 +6,7 @@
  * Requires DATABASE_URL environment variable
  */
 
-import { readFileSync, readdirSync } from "fs";
+import { readFileSync, readdirSync, existsSync } from "fs";
 import { join } from "path";
 import pg from "pg";
 
@@ -31,7 +31,18 @@ async function runMigrations() {
     console.log("Connected successfully!\n");
 
     // Get migration files
-    const migrationsDir = join(process.cwd(), "supabase", "migrations");
+    // Handle being run from workspace or root
+    let migrationsDir = join(process.cwd(), "supabase", "migrations");
+    if (!existsSync(migrationsDir)) {
+      // Running from workspace, go up to root
+      migrationsDir = join(process.cwd(), "..", "..", "supabase", "migrations");
+    }
+    
+    if (!existsSync(migrationsDir)) {
+      console.error(`ERROR: Could not find migrations directory at ${migrationsDir}`);
+      process.exit(1);
+    }
+    
     const files = readdirSync(migrationsDir)
       .filter((f) => f.endsWith(".sql"))
       .sort();

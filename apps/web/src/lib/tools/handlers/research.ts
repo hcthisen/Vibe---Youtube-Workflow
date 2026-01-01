@@ -45,7 +45,7 @@ export async function channelImportLatest20Handler(
         channel_name: result.channel_name,
         raw_provider_payload: video.raw_payload || {},
       }, {
-        onConflict: "youtube_video_id",
+        onConflict: "user_id,youtube_video_id",
       });
     }
 
@@ -89,7 +89,16 @@ export async function outlierSearchHandler(
       return { success: false, error: result.error, logs };
     }
 
-    logs.push(`Found ${result.videos.length} videos`);
+    logs.push(`Found ${result.videos.length} videos from DataForSEO`);
+
+    // Check if we got any videos at all
+    if (result.videos.length === 0) {
+      return {
+        success: false,
+        error: `No videos found for keywords: ${input.keywords.join(", ")}. Try different keywords or broaden your search.`,
+        logs,
+      };
+    }
 
     // Get user's channel baseline for scoring
     const supabase = await createServiceClient();
@@ -100,6 +109,7 @@ export async function outlierSearchHandler(
       .single();
 
     const channelAvgViews = channel?.avg_views || 10000; // Default baseline
+    logs.push(`Using channel baseline: ${channelAvgViews} avg views`);
 
     // Calculate scores
     const scoredResults = result.videos.map((video) => {
@@ -144,36 +154,88 @@ export async function outlierSearchHandler(
           modifiers_sum: modifiersSum,
           final_score: finalScore,
         },
+        age_in_days: ageInDays,
       };
     });
 
-    // Sort by score
-    scoredResults.sort((a, b) => b.score - a.score);
+    logs.push(`Scored ${scoredResults.length} videos`);
 
-    // Store videos in database
-    for (const video of scoredResults) {
+    // Apply filters
+    let filteredResults = scoredResults;
+    const initialCount = filteredResults.length;
+
+    // Filter by min_views if specified
+    if (input.min_views && input.min_views > 0) {
+      filteredResults = filteredResults.filter(
+        (video) => (video.views_count || 0) >= input.min_views!
+      );
+      const removedByViews = initialCount - filteredResults.length;
+      if (removedByViews > 0) {
+        logs.push(`Filtered out ${removedByViews} videos below ${input.min_views} views`);
+      }
+    }
+
+    // Filter by max_age_days if specified
+    if (input.max_age_days && input.max_age_days > 0) {
+      const beforeAgeFilter = filteredResults.length;
+      filteredResults = filteredResults.filter(
+        (video) => video.age_in_days <= input.max_age_days!
+      );
+      const removedByAge = beforeAgeFilter - filteredResults.length;
+      if (removedByAge > 0) {
+        logs.push(`Filtered out ${removedByAge} videos older than ${input.max_age_days} days`);
+      }
+    }
+
+    // Check if all videos were filtered out
+    if (filteredResults.length === 0) {
+      const filterDetails: string[] = [];
+      if (input.min_views && input.min_views > 0) {
+        filterDetails.push(`minimum ${input.min_views} views`);
+      }
+      if (input.max_age_days && input.max_age_days > 0) {
+        filterDetails.push(`maximum ${input.max_age_days} days old`);
+      }
+      return {
+        success: false,
+        error: `All ${initialCount} videos were filtered out by your criteria (${filterDetails.join(", ")}). Try relaxing your filters.`,
+        logs,
+      };
+    }
+
+    logs.push(`${filteredResults.length} videos after filtering`);
+
+    // Sort by score
+    filteredResults.sort((a, b) => b.score - a.score);
+
+    // Store videos in database (remove age_in_days before storing)
+    for (const video of filteredResults) {
+      const { age_in_days, ...videoData } = video;
       await supabase.from("videos").upsert({
-        id: video.video_id,
+        id: videoData.video_id,
         user_id: context.userId,
         source: "research",
-        youtube_video_id: video.youtube_video_id,
-        title: video.title,
-        thumbnail_url: video.thumbnail_url,
-        published_at: video.published_at,
-        views_count: video.views_count,
-        channel_name: video.channel_name,
+        youtube_video_id: videoData.youtube_video_id,
+        title: videoData.title,
+        thumbnail_url: videoData.thumbnail_url,
+        published_at: videoData.published_at,
+        views_count: videoData.views_count,
+        channel_name: videoData.channel_name,
       }, {
-        onConflict: "youtube_video_id",
+        onConflict: "user_id,youtube_video_id",
       });
     }
 
-    logs.push(`Scored and stored ${scoredResults.length} videos`);
+    logs.push(`Stored ${filteredResults.length} videos in database`);
+
+    // Remove age_in_days from final results
+    const finalResults = filteredResults.map(({ age_in_days, ...video }) => video);
 
     return {
       success: true,
       data: {
-        results: scoredResults,
-        total_found: scoredResults.length,
+        results: finalResults,
+        total_found: finalResults.length,
       },
       logs,
     };

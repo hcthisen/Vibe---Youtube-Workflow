@@ -12,6 +12,12 @@ interface Video {
   channel_name: string | null;
 }
 
+interface Project {
+  id: string;
+  title: string;
+  status: string;
+}
+
 interface Idea {
   id: string;
   score: number;
@@ -22,6 +28,7 @@ interface Idea {
   status: string;
   created_at: string;
   videos: Video | null;
+  projects: Project | null;
 }
 
 interface SavedIdeasProps {
@@ -33,8 +40,13 @@ export function SavedIdeas({ ideas }: SavedIdeasProps) {
   const supabase = createClient();
 
   const handleCreateProject = async (idea: Idea) => {
-    // Navigate to project creation with this idea
-    router.push(`/projects/new?idea_id=${idea.id}`);
+    // If project already exists, navigate to it
+    if (idea.projects) {
+      router.push(`/projects/${idea.projects.id}`);
+    } else {
+      // Navigate to project creation with this idea
+      router.push(`/projects/new?idea_id=${idea.id}`);
+    }
   };
 
   const handleDiscard = async (ideaId: string) => {
@@ -107,9 +119,16 @@ export function SavedIdeas({ ideas }: SavedIdeasProps) {
 
             {/* Content */}
             <div className="flex-1 min-w-0">
-              <h4 className="text-white font-medium line-clamp-2">
-                {idea.videos?.title || idea.ai_summary?.slice(0, 100) || "Untitled Idea"}
-              </h4>
+              <div className="flex items-start gap-2">
+                <h4 className="text-white font-medium line-clamp-2 flex-1">
+                  {idea.videos?.title || idea.ai_summary?.slice(0, 100) || "Untitled Idea"}
+                </h4>
+                {idea.status === "project_created" && (
+                  <span className="px-2 py-1 bg-accent-600/20 border border-accent-600/30 rounded text-xs text-accent-400 font-medium whitespace-nowrap">
+                    Project Created
+                  </span>
+                )}
+              </div>
               {idea.videos?.channel_name && (
                 <p className="text-sm text-gray-400 mt-1">{idea.videos.channel_name}</p>
               )}
@@ -138,16 +157,22 @@ export function SavedIdeas({ ideas }: SavedIdeasProps) {
             <div className="flex-shrink-0 flex flex-col gap-2">
               <button
                 onClick={() => handleCreateProject(idea)}
-                className="px-4 py-2 bg-accent-600 hover:bg-accent-700 text-white text-sm font-medium rounded-lg transition-colors"
+                className={`px-4 py-2 text-white text-sm font-medium rounded-lg transition-colors ${
+                  idea.status === "project_created"
+                    ? "bg-primary-600 hover:bg-primary-700"
+                    : "bg-accent-600 hover:bg-accent-700"
+                }`}
               >
-                Create Project
+                {idea.status === "project_created" ? "View Project" : "Create Project"}
               </button>
-              <button
-                onClick={() => handleDiscard(idea.id)}
-                className="px-4 py-2 border border-gray-600 hover:border-red-500 text-gray-400 hover:text-red-400 text-sm font-medium rounded-lg transition-colors"
-              >
-                Discard
-              </button>
+              {idea.status !== "project_created" && (
+                <button
+                  onClick={() => handleDiscard(idea.id)}
+                  className="px-4 py-2 border border-gray-600 hover:border-red-500 text-gray-400 hover:text-red-400 text-sm font-medium rounded-lg transition-colors"
+                >
+                  Discard
+                </button>
+              )}
             </div>
           </div>
 

@@ -53,6 +53,7 @@ export interface Database {
           baseline_video_ids: Json;
           baseline_summary: string | null;
           baseline_keywords: Json;
+          baseline_transcripts: Json;
           avg_views: number | null;
           created_at: string;
           updated_at: string;
@@ -64,6 +65,7 @@ export interface Database {
           baseline_video_ids?: Json;
           baseline_summary?: string | null;
           baseline_keywords?: Json;
+          baseline_transcripts?: Json;
           avg_views?: number | null;
           created_at?: string;
           updated_at?: string;
@@ -75,6 +77,7 @@ export interface Database {
           baseline_video_ids?: Json;
           baseline_summary?: string | null;
           baseline_keywords?: Json;
+          baseline_transcripts?: Json;
           avg_views?: number | null;
           created_at?: string;
           updated_at?: string;
@@ -131,6 +134,7 @@ export interface Database {
           id: string;
           user_id: string;
           source_video_id: string | null;
+          search_result_id: string | null;
           score: number;
           score_breakdown: Json;
           ai_summary: string | null;
@@ -144,6 +148,7 @@ export interface Database {
           id?: string;
           user_id: string;
           source_video_id?: string | null;
+          search_result_id?: string | null;
           score?: number;
           score_breakdown?: Json;
           ai_summary?: string | null;
@@ -157,6 +162,7 @@ export interface Database {
           id?: string;
           user_id?: string;
           source_video_id?: string | null;
+          search_result_id?: string | null;
           score?: number;
           score_breakdown?: Json;
           ai_summary?: string | null;
@@ -177,6 +183,7 @@ export interface Database {
           status: string;
           outline: Json | null;
           title_variants: Json | null;
+          idea_brief_markdown: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -188,6 +195,7 @@ export interface Database {
           status?: string;
           outline?: Json | null;
           title_variants?: Json | null;
+          idea_brief_markdown?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -199,6 +207,7 @@ export interface Database {
           status?: string;
           outline?: Json | null;
           title_variants?: Json | null;
+          idea_brief_markdown?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -354,6 +363,36 @@ export interface Database {
           pose_bucket?: string | null;
           created_at?: string;
           updated_at?: string;
+        };
+        Relationships: [];
+      };
+      search_results: {
+        Row: {
+          id: string;
+          user_id: string;
+          search_type: string;
+          search_params: Json;
+          results: Json;
+          results_count: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          search_type: string;
+          search_params?: Json;
+          results?: Json;
+          results_count?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          search_type?: string;
+          search_params?: Json;
+          results?: Json;
+          results_count?: number;
+          created_at?: string;
         };
         Relationships: [];
       };

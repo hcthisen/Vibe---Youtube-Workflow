@@ -1,28 +1,39 @@
 """
-Video Processing Handler - Silence removal and transitions.
+Video Processing Handler - Complete pipeline with VAD, transcription, LLM cuts, and intro transition.
 """
 import os
 import json
 import logging
 from typing import Any, Dict
-import subprocess
-import tempfile
 
 from .base import BaseHandler
+from ..utils.vad_processor import process_video_vad
+from ..utils.transcription import transcribe_video, search_transcript_for_phrases, remove_segments_from_transcript
+from ..utils.llm_cuts import analyze_retake_cuts, apply_cuts_to_video
+from ..utils.intro_transition import add_intro_transition
 
 logger = logging.getLogger(__name__)
 
 
 class VideoProcessHandler(BaseHandler):
-    """Handler for video processing jobs."""
+    """Handler for video processing jobs with complete pipeline."""
 
     def process(self, job_id: str, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Process a video: remove silence, apply transitions."""
+        """
+        Process a video through the complete pipeline:
+        1. VAD silence removal
+        2. Transcription
+        3. Retake marker detection & LLM cuts (if enabled)
+        4. Intro transition (if enabled)
+        5. Upload all assets
+        """
         try:
             asset_id = input_data.get("asset_id")
             silence_threshold_ms = input_data.get("silence_threshold_ms", 500)
             retake_markers = input_data.get("retake_markers", [])
-            apply_transition = input_data.get("apply_intro_transition", False)
+            apply_intro_transition = input_data.get("apply_intro_transition", False)
+
+            logger.info(f"Starting video processing pipeline for asset {asset_id}")
 
             # Get asset info
             asset = self.supabase.table("project_assets").select("*").eq(
@@ -40,8 +51,9 @@ class VideoProcessHandler(BaseHandler):
 
             # Create temp files
             input_path = os.path.join(self.temp_dir, f"{job_id}_input.mp4")
-            output_path = os.path.join(self.temp_dir, f"{job_id}_output.mp4")
-            audio_path = os.path.join(self.temp_dir, f"{job_id}_audio.wav")
+            vad_output_path = os.path.join(self.temp_dir, f"{job_id}_vad.mp4")
+            cuts_output_path = os.path.join(self.temp_dir, f"{job_id}_cuts.mp4")
+            final_output_path = os.path.join(self.temp_dir, f"{job_id}_final.mp4")
 
             try:
                 # Download video
@@ -49,45 +61,132 @@ class VideoProcessHandler(BaseHandler):
                 if not self.download_asset(bucket, path, input_path):
                     return {"success": False, "error": "Failed to download video"}
 
-                # Get original duration
-                original_duration = self._get_duration(input_path)
+                # ===== STEP 1: VAD Silence Removal =====
+                logger.info("Step 1: VAD silence removal")
+                vad_result = process_video_vad(
+                    input_path=input_path,
+                    output_path=vad_output_path,
+                    min_silence=silence_threshold_ms / 1000,
+                    min_speech=0.25,
+                    padding_ms=100,
+                    merge_gap=0.3,
+                    keep_start=True
+                )
 
-                # Extract audio
-                logger.info("Extracting audio for analysis")
-                self._extract_audio(input_path, audio_path)
+                if not vad_result["success"]:
+                    return {"success": False, "error": vad_result.get("error", "VAD processing failed")}
 
-                # Detect speech segments using VAD
-                logger.info("Detecting speech segments")
-                speech_segments = self._detect_speech(audio_path, silence_threshold_ms)
+                original_duration_ms = vad_result["original_duration_ms"]
+                after_vad_duration_ms = vad_result["processed_duration_ms"]
+                silence_removed_ms = vad_result["silence_removed_ms"]
 
-                # Generate cut list
-                cuts = self._generate_cuts(speech_segments, original_duration, silence_threshold_ms)
+                # ===== STEP 2: Transcription =====
+                logger.info("Step 2: Transcription")
+                transcription_result = transcribe_video(
+                    video_path=vad_output_path,
+                    model_name="base"
+                )
 
-                # Apply cuts
-                logger.info(f"Applying {len(cuts)} cuts")
-                self._apply_cuts(input_path, output_path, speech_segments)
+                if not transcription_result["success"]:
+                    logger.warning(f"Transcription failed: {transcription_result.get('error')}")
+                    transcript_words = []
+                    transcript_plaintext = ""
+                else:
+                    transcript_words = transcription_result["words"]
+                    transcript_plaintext = transcription_result["plaintext"]
 
-                # Get processed duration
-                processed_duration = self._get_duration(output_path)
+                # ===== STEP 3: Retake Marker Detection & LLM Cuts (if enabled) =====
+                retake_cuts = []
+                after_cuts_duration_ms = after_vad_duration_ms
+                current_video_path = vad_output_path
 
-                # Calculate stats
-                total_silence_removed = original_duration - processed_duration
+                if retake_markers and transcript_words:
+                    logger.info(f"Step 3: Retake marker detection (markers: {retake_markers})")
+                    
+                    # Search for retake phrases
+                    retake_matches = search_transcript_for_phrases(transcript_words, retake_markers)
+                    
+                    if retake_matches:
+                        logger.info(f"Found {len(retake_matches)} retake markers")
+                        
+                        # Get OpenAI API key from environment
+                        openai_api_key = os.getenv("OPENAI_API_KEY")
+                        
+                        if openai_api_key:
+                            # Use LLM to analyze cuts
+                            cut_instructions = analyze_retake_cuts(
+                                transcript_words=transcript_words,
+                                retake_matches=retake_matches,
+                                api_key=openai_api_key
+                            )
+                            
+                            if cut_instructions:
+                                # Apply cuts
+                                cuts_result = apply_cuts_to_video(
+                                    input_path=vad_output_path,
+                                    output_path=cuts_output_path,
+                                    cut_instructions=cut_instructions,
+                                    original_segments=vad_result.get("speech_segments", [])
+                                )
+                                
+                                if cuts_result["success"]:
+                                    # Update transcript to remove words in cut segments
+                                    transcript_words = remove_segments_from_transcript(
+                                        transcript_words,
+                                        cut_instructions
+                                    )
+                                    transcript_plaintext = " ".join([w["word"] for w in transcript_words])
+                                    
+                                    retake_cuts = cut_instructions
+                                    current_video_path = cuts_output_path
+                                    
+                                    # Calculate new duration
+                                    from ..utils.vad_processor import get_duration
+                                    after_cuts_duration_ms = int(get_duration(cuts_output_path) * 1000)
+                        else:
+                            logger.warning("OPENAI_API_KEY not set - skipping LLM retake analysis")
+                    else:
+                        logger.info("No retake markers found in transcript")
+                else:
+                    logger.info("Step 3: Skipping retake detection (not enabled or no transcript)")
 
+                # ===== STEP 4: Intro Transition (if enabled) =====
+                intro_applied = False
+                if apply_intro_transition:
+                    logger.info("Step 4: Adding intro transition")
+                    intro_result = add_intro_transition(
+                        input_path=current_video_path,
+                        output_path=final_output_path
+                    )
+                    
+                    if intro_result["success"]:
+                        intro_applied = intro_result.get("transition_applied", False)
+                        current_video_path = final_output_path
+                    else:
+                        logger.warning(f"Intro transition failed: {intro_result.get('error')}")
+                else:
+                    logger.info("Step 4: Skipping intro transition (not enabled)")
+                    # Copy to final output
+                    import shutil
+                    shutil.copy(current_video_path, final_output_path)
+                    current_video_path = final_output_path
+
+                # ===== STEP 5: Upload Assets =====
+                logger.info("Step 5: Uploading assets")
+                
                 # Upload processed video
                 output_storage_path = path.replace(".mp4", "_processed.mp4").replace(
                     ".mov", "_processed.mp4"
                 ).replace(".webm", "_processed.mp4")
 
-                logger.info(f"Uploading processed video to {output_storage_path}")
                 if not self.upload_asset(
                     "project-processed-videos",
                     output_storage_path,
-                    output_path,
+                    current_video_path,
                     "video/mp4"
                 ):
                     return {"success": False, "error": "Failed to upload processed video"}
 
-                # Create asset record
                 processed_asset_id = self.create_asset_record(
                     user_id=user_id,
                     project_id=project_id,
@@ -96,30 +195,96 @@ class VideoProcessHandler(BaseHandler):
                     path=output_storage_path,
                     metadata={
                         "original_asset_id": asset_id,
-                        "original_duration_ms": int(original_duration * 1000),
-                        "processed_duration_ms": int(processed_duration * 1000),
-                        "total_silence_removed_ms": int(total_silence_removed * 1000),
-                        "cuts_count": len(cuts),
+                        "original_duration_ms": original_duration_ms,
+                        "processed_duration_ms": after_cuts_duration_ms,
                     }
                 )
 
-                # Create edit report
+                # Upload transcript (JSON)
+                if transcript_words:
+                    transcript_json_path = path.replace(".mp4", "_transcript.json").replace(
+                        ".mov", "_transcript.json"
+                    ).replace(".webm", "_transcript.json")
+                    
+                    transcript_local_path = os.path.join(self.temp_dir, f"{job_id}_transcript.json")
+                    with open(transcript_local_path, "w") as f:
+                        json.dump(transcript_words, f, indent=2)
+                    
+                    if self.upload_asset(
+                        "project-transcripts",
+                        transcript_json_path,
+                        transcript_local_path,
+                        "application/json"
+                    ):
+                        self.create_asset_record(
+                            user_id=user_id,
+                            project_id=project_id,
+                            asset_type="transcript",
+                            bucket="project-transcripts",
+                            path=transcript_json_path,
+                            metadata={
+                                "format": "json",
+                                "word_count": len(transcript_words)
+                            }
+                        )
+                    
+                    # Upload transcript (plaintext)
+                    transcript_txt_path = path.replace(".mp4", "_transcript.txt").replace(
+                        ".mov", "_transcript.txt"
+                    ).replace(".webm", "_transcript.txt")
+                    
+                    transcript_txt_local_path = os.path.join(self.temp_dir, f"{job_id}_transcript.txt")
+                    with open(transcript_txt_local_path, "w") as f:
+                        f.write(transcript_plaintext)
+                    
+                    if self.upload_asset(
+                        "project-transcripts",
+                        transcript_txt_path,
+                        transcript_txt_local_path,
+                        "text/plain"
+                    ):
+                        self.create_asset_record(
+                            user_id=user_id,
+                            project_id=project_id,
+                            asset_type="transcript",
+                            bucket="project-transcripts",
+                            path=transcript_txt_path,
+                            metadata={
+                                "format": "plaintext",
+                                "word_count": len(transcript_words)
+                            }
+                        )
+
+                # Create and upload edit report
                 edit_report = {
-                    "original_duration_ms": int(original_duration * 1000),
-                    "processed_duration_ms": int(processed_duration * 1000),
-                    "total_silence_removed_ms": int(total_silence_removed * 1000),
-                    "cuts": cuts,
+                    "original_duration_ms": original_duration_ms,
+                    "after_silence_removal_ms": after_vad_duration_ms,
+                    "after_retake_cuts_ms": after_cuts_duration_ms,
+                    "final_duration_ms": after_cuts_duration_ms,
+                    "silence_removed_ms": silence_removed_ms,
+                    "retake_cuts": retake_cuts,
+                    "intro_transition_applied": intro_applied,
+                    "transcript_word_count": len(transcript_words),
+                    "transcript_words_removed": transcription_result.get("word_count", 0) - len(transcript_words),
+                    "processing_steps": [
+                        "vad_silence_removal",
+                        "transcription",
+                        "llm_retake_cuts" if retake_cuts else None,
+                        "intro_transition" if intro_applied else None
+                    ]
                 }
+                # Remove None values
+                edit_report["processing_steps"] = [s for s in edit_report["processing_steps"] if s]
 
                 report_path = path.replace(".mp4", "_report.json").replace(
                     ".mov", "_report.json"
                 ).replace(".webm", "_report.json")
 
-                # Save and upload report
                 report_local_path = os.path.join(self.temp_dir, f"{job_id}_report.json")
                 with open(report_local_path, "w") as f:
-                    json.dump(edit_report, f)
+                    json.dump(edit_report, f, indent=2)
 
+                report_asset_id = None
                 if self.upload_asset(
                     "project-reports",
                     report_path,
@@ -134,8 +299,8 @@ class VideoProcessHandler(BaseHandler):
                         path=report_path,
                         metadata=edit_report
                     )
-                else:
-                    report_asset_id = None
+
+                logger.info("Video processing pipeline completed successfully")
 
                 return {
                     "success": True,
@@ -143,196 +308,24 @@ class VideoProcessHandler(BaseHandler):
                         "processed_asset_id": processed_asset_id,
                         "edit_report_asset_id": report_asset_id,
                         "edit_report": {
-                            "original_duration_ms": edit_report["original_duration_ms"],
-                            "processed_duration_ms": edit_report["processed_duration_ms"],
-                            "total_silence_removed_ms": edit_report["total_silence_removed_ms"],
-                            "cuts_count": len(cuts),
+                            "original_duration_ms": original_duration_ms,
+                            "processed_duration_ms": after_cuts_duration_ms,
+                            "silence_removed_ms": silence_removed_ms,
+                            "retake_cuts_count": len(retake_cuts),
+                            "transcript_word_count": len(transcript_words),
                         },
                     },
                 }
 
             finally:
                 # Cleanup temp files
-                for f in [input_path, output_path, audio_path]:
+                for f in [input_path, vad_output_path, cuts_output_path, final_output_path]:
                     if os.path.exists(f):
-                        os.remove(f)
+                        try:
+                            os.remove(f)
+                        except:
+                            pass
 
         except Exception as e:
             logger.exception("Video processing failed")
             return {"success": False, "error": str(e)}
-
-    def _get_duration(self, path: str) -> float:
-        """Get video duration in seconds."""
-        result = subprocess.run(
-            [
-                "ffprobe",
-                "-v", "error",
-                "-show_entries", "format=duration",
-                "-of", "default=noprint_wrappers=1:nokey=1",
-                path
-            ],
-            capture_output=True,
-            text=True
-        )
-        return float(result.stdout.strip())
-
-    def _extract_audio(self, video_path: str, audio_path: str):
-        """Extract audio from video."""
-        subprocess.run(
-            [
-                "ffmpeg",
-                "-i", video_path,
-                "-vn",
-                "-acodec", "pcm_s16le",
-                "-ar", "16000",
-                "-ac", "1",
-                audio_path,
-                "-y"
-            ],
-            capture_output=True,
-            check=True
-        )
-
-    def _detect_speech(self, audio_path: str, silence_threshold_ms: int) -> list:
-        """Detect speech segments using WebRTC VAD."""
-        import webrtcvad
-        import wave
-
-        vad = webrtcvad.Vad(3)  # Aggressiveness 0-3
-
-        with wave.open(audio_path, "rb") as wf:
-            sample_rate = wf.getframerate()
-            audio = wf.readframes(wf.getnframes())
-
-        # Frame size in ms (10, 20, or 30)
-        frame_duration_ms = 30
-        frame_size = int(sample_rate * frame_duration_ms / 1000) * 2  # 2 bytes per sample
-
-        segments = []
-        in_speech = False
-        speech_start = 0
-
-        for i in range(0, len(audio) - frame_size, frame_size):
-            frame = audio[i:i + frame_size]
-            timestamp_ms = (i // 2) * 1000 // sample_rate
-
-            is_speech = vad.is_speech(frame, sample_rate)
-
-            if is_speech and not in_speech:
-                # Speech started
-                in_speech = True
-                speech_start = timestamp_ms
-            elif not is_speech and in_speech:
-                # Speech ended
-                in_speech = False
-                segments.append({
-                    "start_ms": speech_start,
-                    "end_ms": timestamp_ms,
-                })
-
-        # Handle case where audio ends during speech
-        if in_speech:
-            segments.append({
-                "start_ms": speech_start,
-                "end_ms": len(audio) // 2 * 1000 // sample_rate,
-            })
-
-        # Merge segments that are close together (less than silence_threshold)
-        merged = []
-        for segment in segments:
-            if merged and segment["start_ms"] - merged[-1]["end_ms"] < silence_threshold_ms:
-                merged[-1]["end_ms"] = segment["end_ms"]
-            else:
-                merged.append(segment)
-
-        return merged
-
-    def _generate_cuts(self, speech_segments: list, total_duration: float, threshold_ms: int) -> list:
-        """Generate list of cuts (silence removed)."""
-        cuts = []
-        prev_end = 0
-
-        for segment in speech_segments:
-            start = segment["start_ms"]
-            if start - prev_end > threshold_ms:
-                cuts.append({
-                    "start_ms": prev_end,
-                    "end_ms": start,
-                    "duration_ms": start - prev_end,
-                    "reason": "silence",
-                })
-            prev_end = segment["end_ms"]
-
-        # Check for trailing silence
-        total_ms = int(total_duration * 1000)
-        if total_ms - prev_end > threshold_ms:
-            cuts.append({
-                "start_ms": prev_end,
-                "end_ms": total_ms,
-                "duration_ms": total_ms - prev_end,
-                "reason": "silence",
-            })
-
-        return cuts
-
-    def _apply_cuts(self, input_path: str, output_path: str, speech_segments: list):
-        """Apply cuts using ffmpeg concat."""
-        if not speech_segments:
-            # No cuts needed, just copy
-            subprocess.run(
-                ["ffmpeg", "-i", input_path, "-c", "copy", output_path, "-y"],
-                capture_output=True,
-                check=True
-            )
-            return
-
-        # Create concat file
-        concat_file = os.path.join(self.temp_dir, "concat.txt")
-        segment_files = []
-
-        for i, segment in enumerate(speech_segments):
-            start_sec = segment["start_ms"] / 1000
-            end_sec = segment["end_ms"] / 1000
-            segment_file = os.path.join(self.temp_dir, f"segment_{i}.mp4")
-            segment_files.append(segment_file)
-
-            subprocess.run(
-                [
-                    "ffmpeg",
-                    "-i", input_path,
-                    "-ss", str(start_sec),
-                    "-to", str(end_sec),
-                    "-c", "copy",
-                    segment_file,
-                    "-y"
-                ],
-                capture_output=True,
-                check=True
-            )
-
-        # Write concat file
-        with open(concat_file, "w") as f:
-            for seg_file in segment_files:
-                f.write(f"file '{seg_file}'\n")
-
-        # Concatenate segments
-        subprocess.run(
-            [
-                "ffmpeg",
-                "-f", "concat",
-                "-safe", "0",
-                "-i", concat_file,
-                "-c", "copy",
-                output_path,
-                "-y"
-            ],
-            capture_output=True,
-            check=True
-        )
-
-        # Cleanup segment files
-        for seg_file in segment_files:
-            if os.path.exists(seg_file):
-                os.remove(seg_file)
-        os.remove(concat_file)
-

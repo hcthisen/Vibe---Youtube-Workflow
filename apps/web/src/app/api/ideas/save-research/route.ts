@@ -13,12 +13,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { title_concept, thesis, hook_options, thumbnail_text_ideas } = await request.json();
+    const { title_concept, thesis, hook_options, thumbnail_text_ideas, search_result_id } = await request.json();
 
     const { data: idea, error } = await supabase
       .from("ideas")
       .insert({
         user_id: user.id,
+        search_result_id: search_result_id || null,
         ai_summary: `${title_concept}\n\n${thesis}`,
         hook_options,
         title_variants: thumbnail_text_ideas,

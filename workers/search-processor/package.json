@@ -1,0 +1,23 @@
+{
+  "name": "search-processor",
+  "version": "1.0.0",
+  "description": "Background worker for async search job processing",
+  "main": "worker.ts",
+  "scripts": {
+    "start": "tsx worker.ts",
+    "dev": "tsx watch worker.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.47.10",
+    "dotenv": "^16.4.5",
+    "zod": "^3.24.1",
+    "openai": "^4.67.3",
+    "axios": "^1.7.9"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
+

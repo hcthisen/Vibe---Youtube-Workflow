@@ -26,6 +26,25 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+DEBUG_LOG_PATH = "/Users/hc/Documents/GitHub/Vibe---Youtube-Workflow/.cursor/debug.log"
+
+def _debug_log(hypothesis_id: str, location: str, message: str, data: dict):
+    """Write NDJSON debug log line (avoid secrets)."""
+    try:
+        payload = {
+            "sessionId": "debug-session",
+            "runId": "media-fix",
+            "hypothesisId": hypothesis_id,
+            "location": location,
+            "message": message,
+            "data": data,
+            "timestamp": int(time.time() * 1000),
+        }
+        with open(DEBUG_LOG_PATH, "a") as f:
+            f.write(json.dumps(payload) + "\n")
+    except Exception:
+        pass
+
 
 class MediaWorker:
     """Worker that polls for jobs and dispatches to handlers."""
@@ -67,6 +86,8 @@ class MediaWorker:
     def _get_next_job(self):
         """Get the next queued job."""
         conn = self._connect_db()
+        supported_types = list(self.handlers.keys())
+        _debug_log("F", "workers/media/worker.py:_get_next_job", "Polling for next media job", {"supported_types": supported_types})
         
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             # Lock and fetch next queued job
@@ -76,16 +97,17 @@ class MediaWorker:
                 WHERE id = (
                     SELECT id FROM jobs
                     WHERE status = 'queued'
+                      AND type = ANY(%s)
                     ORDER BY created_at ASC
                     FOR UPDATE SKIP LOCKED
                     LIMIT 1
                 )
                 RETURNING *
-            """)
+            """, (supported_types,))
             
             job = cur.fetchone()
             conn.commit()
-            
+            _debug_log("F", "workers/media/worker.py:_get_next_job", "Fetched job", {"found": bool(job), "job_type": job.get("type") if job else None, "job_id": job.get("id") if job else None})
             return dict(job) if job else None
 
     def _complete_job(self, job_id: str, output: dict):
@@ -123,6 +145,7 @@ class MediaWorker:
         handler = self.handlers.get(job_type)
         
         if not handler:
+            _debug_log("H", "workers/media/worker.py:_process_job", "Unknown job type reached in media worker", {"job_id": job_id, "job_type": job_type})
             self._fail_job(job_id, f"Unknown job type: {job_type}")
             return
         

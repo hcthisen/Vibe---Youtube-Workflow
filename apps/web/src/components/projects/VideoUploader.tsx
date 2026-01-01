@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import * as tus from "tus-js-client";
 
 interface VideoUploaderProps {
   projectId: string;
@@ -13,6 +14,7 @@ export function VideoUploader({ projectId }: VideoUploaderProps) {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const uploadRef = useRef<tus.Upload | null>(null);
 
   const supabase = createClient();
 
@@ -38,6 +40,7 @@ export function VideoUploader({ projectId }: VideoUploaderProps) {
       setProgress(0);
 
       try {
+        // Get authenticated user and session
         const {
           data: { user },
         } = await supabase.auth.getUser();
@@ -46,45 +49,83 @@ export function VideoUploader({ projectId }: VideoUploaderProps) {
           throw new Error("Not authenticated");
         }
 
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (!session) {
+          throw new Error("No active session");
+        }
+
         const fileExt = file.name.split(".").pop();
         const filePath = `${user.id}/${projectId}/${Date.now()}.${fileExt}`;
 
-        // Upload with progress tracking
-        const { error: uploadError } = await supabase.storage
-          .from("project-raw-videos")
-          .upload(filePath, file, {
-            cacheControl: "3600",
-            upsert: false,
-          });
-
-        if (uploadError) {
-          throw uploadError;
+        // Get Supabase URL from environment
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        if (!supabaseUrl) {
+          throw new Error("Supabase URL not configured");
         }
 
-        setProgress(80);
+        // Create TUS resumable upload
+        const upload = new tus.Upload(file, {
+          endpoint: `${supabaseUrl}/storage/v1/upload/resumable`,
+          retryDelays: [0, 1000, 3000, 5000],
+          headers: {
+            authorization: `Bearer ${session.access_token}`,
+            "x-upsert": "false",
+          },
+          uploadDataDuringCreation: true,
+          removeFingerprintOnSuccess: true,
+          metadata: {
+            bucketName: "project-raw-videos",
+            objectName: filePath,
+            contentType: file.type,
+            cacheControl: "3600",
+          },
+          chunkSize: 6 * 1024 * 1024, // 6MB chunks
+          onError: (error) => {
+            console.error("Upload error:", error);
+            setError(error.message || "Upload failed");
+            setUploading(false);
+          },
+          onProgress: (bytesUploaded, bytesTotal) => {
+            const percentage = Math.round((bytesUploaded / bytesTotal) * 100);
+            setProgress(percentage);
+          },
+          onSuccess: async () => {
+            try {
+              // Finalize upload and create job
+              const response = await fetch("/api/tools/video_upload_finalize", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  project_id: projectId,
+                  asset_path: filePath,
+                  filename: file.name,
+                }),
+              });
 
-        // Finalize upload and create job
-        const response = await fetch("/api/tools/video_upload_finalize", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            project_id: projectId,
-            asset_path: filePath,
-            filename: file.name,
-          }),
+              const result = await response.json();
+
+              if (!result.success) {
+                throw new Error(result.error || "Failed to finalize upload");
+              }
+
+              setProgress(100);
+              router.refresh();
+            } catch (err) {
+              setError(err instanceof Error ? err.message : "Failed to finalize upload");
+            } finally {
+              setUploading(false);
+            }
+          },
         });
 
-        const result = await response.json();
-
-        if (!result.success) {
-          throw new Error(result.error || "Failed to finalize upload");
-        }
-
-        setProgress(100);
-        router.refresh();
+        uploadRef.current = upload;
+        upload.start();
       } catch (err) {
+        console.error("Upload initialization error:", err);
         setError(err instanceof Error ? err.message : "Upload failed");
-      } finally {
         setUploading(false);
       }
     },

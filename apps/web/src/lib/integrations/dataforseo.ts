@@ -46,6 +46,10 @@ class DataForSEOClient {
   private auth: string;
 
   constructor() {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/18d926b1-f741-4713-b147-77616fe448c6',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dataforseo.ts:50',message:'DataForSEO constructor called',data:{hasLogin:!!process.env.DATAFORSEO_LOGIN,hasPassword:!!process.env.DATAFORSEO_PASSWORD,allEnvKeys:Object.keys(process.env).filter(k=>k.includes('DATA'))},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B,D'})}).catch(()=>{});
+    // #endregion
+    
     const login = process.env.DATAFORSEO_LOGIN;
     const password = process.env.DATAFORSEO_PASSWORD;
 
@@ -249,42 +253,108 @@ class DataForSEOClient {
 
   async searchVideos(params: SearchVideosParams): Promise<SearchVideosResult> {
     try {
+      // Use live/advanced endpoint for immediate results (same as getChannelVideos)
       const searchResult = await this.request<{
-        tasks: Array<{
-          result: Array<{
-            items: Array<{
+        status_code: number;
+        // Live endpoint can return either a direct `result` array or be wrapped in `tasks[0].result`
+        result?: Array<{
+          items?: Array<{
+            type: string;
+            video_id?: string;
+            title?: string;
+            url?: string;
+            thumbnail_url?: string;
+            timestamp?: string;
+            publication_date?: string;
+            views_count?: number;
+            channel_name?: string;
+            is_shorts?: boolean;
+          }>;
+        }>;
+        tasks?: Array<{
+          status_code?: number;
+          status_message?: string;
+          result?: Array<{
+            items?: Array<{
               type: string;
               video_id?: string;
               title?: string;
-              thumbnail?: string;
-              published_date?: string;
+              url?: string;
+              thumbnail_url?: string;
+              timestamp?: string;
+              publication_date?: string;
               views_count?: number;
               channel_name?: string;
+              is_shorts?: boolean;
             }>;
           }>;
         }>;
-      }>("/serp/youtube/organic/task_post", [
+      }>("/serp/youtube/organic/live/advanced", [
         {
           keyword: params.keywords.join(" "),
-          language_code: params.language_code || "en",
           location_code: params.location_code || 2840, // USA
-          depth: params.limit || 50,
+          language_code: params.language_code || "en",
+          device: "desktop",
+          os: "windows",
+          block_depth: params.limit || 50, // Use block_depth, not depth
         },
       ]);
 
-      const items = searchResult.tasks?.[0]?.result?.[0]?.items || [];
+      // Check if API returned an error status
+      if (searchResult.status_code !== 20000) {
+        return {
+          success: false,
+          videos: [],
+          error: `API returned status code: ${searchResult.status_code}`,
+        };
+      }
 
-      const videos: VideoResult[] = items
-        .filter((item) => item.type === "youtube_video" || item.video_id)
-        .map((item) => ({
-          youtube_video_id: item.video_id || "",
-          title: item.title || "",
-          thumbnail_url: item.thumbnail || null,
-          published_at: item.published_date || null,
-          views_count: item.views_count || null,
-          channel_name: item.channel_name || null,
-          raw_payload: item,
-        }));
+      // DataForSEO can return top-level OK while the task itself failed.
+      // Example: status_code 20000, but tasks[0].status_code 40501 ("Invalid Field: 'depth'")
+      const taskStatusCode = searchResult.tasks?.[0]?.status_code;
+      const taskStatusMessage = searchResult.tasks?.[0]?.status_message;
+      if (typeof taskStatusCode === "number" && taskStatusCode !== 20000) {
+        return {
+          success: false,
+          videos: [],
+          error: `DataForSEO task error: ${taskStatusCode}${taskStatusMessage ? ` (${taskStatusMessage})` : ""}`,
+        };
+      }
+
+      // Extract items from response (handle both direct result and task-wrapped formats)
+      const items =
+        searchResult.result?.[0]?.items ??
+        searchResult.tasks?.[0]?.result?.[0]?.items ??
+        [];
+
+      // Filter for video items only (exclude channels and playlists)
+      const videoItems = items.filter((item) => item.type === "youtube_video");
+
+      // Exclude Shorts and ensure unique video IDs
+      const nonShortVideoItems = videoItems.filter(
+        (item) => item.is_shorts !== true && !item.url?.includes("/shorts/")
+      );
+
+      const uniqueVideoItems: typeof nonShortVideoItems = [];
+      const seenVideoIds = new Set<string>();
+      for (const item of nonShortVideoItems) {
+        const id = item.video_id;
+        if (!id) continue;
+        if (seenVideoIds.has(id)) continue;
+        seenVideoIds.add(id);
+        uniqueVideoItems.push(item);
+      }
+
+      // Map to VideoResult format
+      const videos: VideoResult[] = uniqueVideoItems.map((item) => ({
+        youtube_video_id: item.video_id || "",
+        title: item.title || "",
+        thumbnail_url: item.thumbnail_url || null,
+        published_at: item.timestamp || item.publication_date || null,
+        views_count: item.views_count || null,
+        channel_name: item.channel_name || null,
+        raw_payload: item,
+      }));
 
       return {
         success: true,

@@ -22,6 +22,16 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "i.ytimg.com",
       },
+      // YouTube sometimes serves thumbnails from numbered subdomains (e.g. i9.ytimg.com)
+      {
+        protocol: "https",
+        hostname: "*.ytimg.com",
+      },
+      // Channel avatars / other YouTube images
+      {
+        protocol: "https",
+        hostname: "yt3.ggpht.com",
+      },
       {
         protocol: "https",
         hostname: "*.supabase.co",

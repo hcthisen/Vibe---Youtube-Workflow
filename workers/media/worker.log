@@ -152,198 +152,450 @@ INFO: Created TensorFlow Lite XNNPACK delegate for CPU.
 2025-12-31 10:57:47,859 [ERROR] Database error: could not receive data from server: Operation timed out
 
 2025-12-31 10:57:56,580 [INFO] Connected to database
-ata from server: Operation timed out
+2025-12-31 11:18:40,760 [INFO] Processing job 8f911cbb-80c6-45d9-8367-fae9a363999a (type: pose_analyze)
+2025-12-31 11:18:41,369 [INFO] HTTP Request: GET https://supabasekong-og0w4c0soc048kkc0gkcs8ow.vizr.cc/rest/v1/headshots?select=%2A&id=eq.e77331f2-0098-4e6f-a9d9-aeb1b78c7ccb "HTTP/2 200 OK"
+2025-12-31 11:18:41,370 [INFO] Downloading headshot from user-headshots/54c452c9-040a-46eb-b95e-90356201f355/1767176316845-3.jpg
+2025-12-31 11:18:41,736 [INFO] HTTP Request: GET https://supabasekong-og0w4c0soc048kkc0gkcs8ow.vizr.cc/storage/v1/object/user-headshots/54c452c9-040a-46eb-b95e-90356201f355/1767176316845-3.jpg "HTTP/2 200 OK"
+2025-12-31 11:18:42,346 [INFO] Analyzing face pose
+2025-12-31 11:18:42,357 [INFO] Pose: yaw=-18.0, pitch=-136.4, bucket=up
+2025-12-31 11:18:42,444 [INFO] HTTP Request: PATCH https://supabasekong-og0w4c0soc048kkc0gkcs8ow.vizr.cc/rest/v1/headshots?id=eq.e77331f2-0098-4e6f-a9d9-aeb1b78c7ccb "HTTP/2 200 OK"
+2025-12-31 11:18:43,048 [INFO] Job 8f911cbb-80c6-45d9-8367-fae9a363999a completed successfully
+2025-12-31 11:19:21,536 [INFO] Processing job 2d7902c5-7f94-44fe-82a7-bfc2235a5859 (type: pose_analyze)
+2025-12-31 11:19:21,730 [INFO] HTTP Request: GET https://supabasekong-og0w4c0soc048kkc0gkcs8ow.vizr.cc/rest/v1/headshots?select=%2A&id=eq.5ba0eda8-f357-4d57-b7a6-1f557c0ca694 "HTTP/2 200 OK"
+2025-12-31 11:19:21,731 [INFO] Downloading headshot from user-headshots/54c452c9-040a-46eb-b95e-90356201f355/1767176314980-1.jpg
+2025-12-31 11:19:22,047 [INFO] HTTP Request: GET https://supabasekong-og0w4c0soc048kkc0gkcs8ow.vizr.cc/storage/v1/object/user-headshots/54c452c9-040a-46eb-b95e-90356201f355/1767176314980-1.jpg "HTTP/2 200 OK"
+2025-12-31 11:19:22,292 [INFO] Analyzing face pose
+2025-12-31 11:19:22,314 [INFO] Pose: yaw=2.2, pitch=2.4, bucket=down
+2025-12-31 11:19:22,395 [INFO] HTTP Request: PATCH https://supabasekong-og0w4c0soc048kkc0gkcs8ow.vizr.cc/rest/v1/headshots?id=eq.5ba0eda8-f357-4d57-b7a6-1f557c0ca694 "HTTP/2 200 OK"
+2025-12-31 11:19:22,611 [INFO] Job 2d7902c5-7f94-44fe-82a7-bfc2235a5859 completed successfully
+2025-12-31 11:56:34,706 [INFO] Processing job 879ec072-0c21-4aad-9ee6-18c9b9a08b34 (type: pose_analyze)
+2025-12-31 11:56:34,977 [INFO] HTTP Request: GET https://supabasekong-og0w4c0soc048kkc0gkcs8ow.vizr.cc/rest/v1/headshots?select=%2A&id=eq.2ffefd62-e1ab-4a3d-95fb-fc2d3992223a "HTTP/2 200 OK"
+2025-12-31 11:56:34,980 [INFO] Downloading headshot from user-headshots/54c452c9-040a-46eb-b95e-90356201f355/1767178593208-2.jpg
+2025-12-31 11:56:35,623 [INFO] HTTP Request: GET https://supabasekong-og0w4c0soc048kkc0gkcs8ow.vizr.cc/storage/v1/object/user-headshots/54c452c9-040a-46eb-b95e-90356201f355/1767178593208-2.jpg "HTTP/2 200 OK"
+2025-12-31 11:56:36,023 [INFO] Analyzing face pose
+2025-12-31 11:56:36,044 [INFO] Pose: yaw=-12.0, pitch=-177.2, bucket=front
+2025-12-31 11:56:36,184 [INFO] HTTP Request: PATCH https://supabasekong-og0w4c0soc048kkc0gkcs8ow.vizr.cc/rest/v1/headshots?id=eq.2ffefd62-e1ab-4a3d-95fb-fc2d3992223a "HTTP/2 200 OK"
+2025-12-31 11:56:36,594 [INFO] Job 879ec072-0c21-4aad-9ee6-18c9b9a08b34 completed successfully
+2025-12-31 13:22:35,125 [ERROR] Database error: could not receive data from server: Network is down
 
-2025-12-31 09:06:10,346 [INFO] Connected to database
-2025-12-31 09:42:10,438 [ERROR] Database error: could not receive data from server: Operation timed out
+2025-12-31 13:22:40,424 [INFO] Connected to database
+2025-12-31 13:46:58,429 [ERROR] Database error: could not receive data from server: Network is down
 
-2025-12-31 09:42:18,747 [INFO] Connected to database
-2025-12-31 09:59:32,869 [ERROR] Database error: could not receive data from server: Operation timed out
+2025-12-31 13:47:03,733 [INFO] Connected to database
+2025-12-31 14:04:05,774 [ERROR] Database error: could not receive data from server: Operation timed out
 
-2025-12-31 09:59:38,832 [INFO] Connected to database
-2025-12-31 10:21:12,306 [ERROR] Database error: could not receive data from server: Operation timed out
+2025-12-31 14:04:11,094 [INFO] Connected to database
+2025-12-31 14:20:49,616 [ERROR] Database error: could not receive data from server: Network is down
 
-2025-12-31 10:21:17,624 [INFO] Connected to database
-2025-12-31 10:40:31,159 [ERROR] Database error: could not receive data from server: Operation timed out
+2025-12-31 14:20:54,932 [INFO] Connected to database
+2025-12-31 14:37:57,879 [ERROR] Database error: could not receive data from server: Network is down
 
-2025-12-31 10:40:36,538 [INFO] Connected to database
-2025-12-31 10:58:14,622 [ERROR] Database error: could not receive data from server: Network is down
+2025-12-31 14:38:03,185 [INFO] Connected to database
+2025-12-31 14:55:13,528 [ERROR] Database error: could not receive data from server: Network is down
 
-2025-12-31 10:58:20,710 [INFO] Connected to database
--12-31 06:55:01,132 [ERROR] Database error: connection to server at "135.181.90.4", port 5432 failed: Network is down
+2025-12-31 14:55:18,817 [INFO] Connected to database
+2025-12-31 15:05:05,022 [ERROR] Database error: could not receive data from server: Operation timed out
+
+2025-12-31 15:05:10,409 [INFO] Connected to database
+2025-12-31 15:21:14,837 [ERROR] Database error: could not receive data from server: Network is down
+
+2025-12-31 15:21:20,146 [INFO] Connected to database
+2025-12-31 15:37:13,970 [ERROR] Database error: could not receive data from server: Network is down
+
+2025-12-31 15:37:19,285 [INFO] Connected to database
+2025-12-31 15:53:08,790 [ERROR] Database error: could not receive data from server: Network is down
+
+2025-12-31 15:53:14,104 [INFO] Connected to database
+2025-12-31 16:06:09,099 [ERROR] Database error: could not receive data from server: Network is down
+
+2025-12-31 16:06:14,416 [INFO] Connected to database
+2025-12-31 16:22:24,585 [ERROR] Database error: could not receive data from server: Operation timed out
+
+2025-12-31 16:22:29,902 [INFO] Connected to database
+2025-12-31 16:40:40,850 [ERROR] Database error: could not receive data from server: Network is down
+
+2025-12-31 16:40:46,159 [INFO] Connected to database
+2025-12-31 16:56:40,823 [ERROR] Database error: could not receive data from server: Network is down
+
+2025-12-31 16:56:46,153 [INFO] Connected to database
+2025-12-31 17:07:03,268 [ERROR] Database error: could not receive data from server: Operation timed out
+
+2025-12-31 17:07:08,567 [INFO] Connected to database
+2025-12-31 17:24:19,051 [ERROR] Database error: could not receive data from server: Operation timed out
+
+2025-12-31 17:24:24,378 [INFO] Connected to database
+2025-12-31 17:41:07,581 [ERROR] Database error: could not receive data from server: Network is down
+
+2025-12-31 17:41:12,876 [INFO] Connected to database
+2025-12-31 17:59:09,344 [ERROR] Database error: could not receive data from server: Network is down
+
+2025-12-31 17:59:14,650 [INFO] Connected to database
+2025-12-31 18:08:09,541 [ERROR] Database error: could not receive data from server: Network is down
+
+2025-12-31 18:08:16,185 [INFO] Connected to database
+2025-12-31 18:24:10,824 [ERROR] Database error: could not receive data from server: Operation timed out
+
+2025-12-31 18:24:16,135 [INFO] Connected to database
+2025-12-31 18:40:54,518 [ERROR] Database error: could not receive data from server: Network is down
+
+2025-12-31 18:40:59,825 [INFO] Connected to database
+2025-12-31 18:57:05,637 [ERROR] Database error: could not receive data from server: Network is down
+
+2025-12-31 18:57:10,991 [INFO] Connected to database
+2025-12-31 19:09:09,611 [ERROR] Database error: could not receive data from server: Network is down
+
+2025-12-31 19:09:14,931 [INFO] Connected to database
+2025-12-31 19:25:12,109 [ERROR] Database error: could not receive data from server: Operation timed out
+
+2025-12-31 19:25:17,412 [INFO] Connected to database
+2025-12-31 19:33:55,578 [ERROR] Database error: could not receive data from server: Network is down
+
+2025-12-31 19:34:00,888 [INFO] Connected to database
+2025-12-31 19:50:27,388 [ERROR] Database error: could not receive data from server: Network is down
+
+2025-12-31 19:50:32,705 [INFO] Connected to database
+2025-12-31 20:07:55,069 [ERROR] Database error: could not receive data from server: Operation timed out
+
+2025-12-31 20:08:00,372 [INFO] Connected to database
+2025-12-31 20:28:08,928 [ERROR] Database error: could not receive data from server: Network is down
+
+2025-12-31 20:28:14,227 [INFO] Connected to database
+2025-12-31 20:50:36,210 [ERROR] Database error: could not receive data from server: Operation timed out
+
+2025-12-31 20:50:41,517 [INFO] Connected to database
+2025-12-31 21:07:50,654 [ERROR] Database error: could not receive data from server: Network is down
+
+2025-12-31 21:07:55,945 [INFO] Connected to database
+2025-12-31 21:28:58,309 [ERROR] Database error: could not receive data from server: Operation timed out
+
+2025-12-31 21:29:03,609 [INFO] Connected to database
+2025-12-31 21:58:57,069 [ERROR] Database error: could not receive data from server: Network is down
+
+2025-12-31 21:59:02,374 [INFO] Connected to database
+2025-12-31 22:12:04,324 [ERROR] Database error: could not receive data from server: Operation timed out
+
+2025-12-31 22:12:09,624 [INFO] Connected to database
+2025-12-31 22:28:56,664 [ERROR] Database error: could not receive data from server: Network is down
+
+2025-12-31 22:29:01,979 [INFO] Connected to database
+2025-12-31 22:53:09,435 [ERROR] Database error: could not receive data from server: Operation timed out
+
+2025-12-31 22:53:14,760 [INFO] Connected to database
+2025-12-31 23:13:03,521 [ERROR] Database error: could not receive data from server: Network is down
+
+2025-12-31 23:13:08,817 [INFO] Connected to database
+2025-12-31 23:29:21,875 [ERROR] Database error: could not receive data from server: Operation timed out
+
+2025-12-31 23:29:27,169 [INFO] Connected to database
+2025-12-31 23:46:09,950 [ERROR] Database error: could not receive data from server: Network is down
+
+2025-12-31 23:46:15,279 [INFO] Connected to database
+2026-01-01 00:03:40,709 [ERROR] Database error: could not receive data from server: Network is down
+
+2026-01-01 00:03:46,036 [INFO] Connected to database
+2026-01-01 00:14:02,919 [ERROR] Database error: could not receive data from server: Network is down
+
+2026-01-01 00:14:08,217 [INFO] Connected to database
+2026-01-01 00:31:36,006 [ERROR] Database error: could not receive data from server: Network is down
+
+2026-01-01 00:31:41,291 [INFO] Connected to database
+2026-01-01 00:52:57,586 [ERROR] Database error: could not receive data from server: Operation timed out
+
+2026-01-01 00:53:02,899 [INFO] Connected to database
+2026-01-01 01:09:40,744 [ERROR] Database error: could not receive data from server: Network is down
+
+2026-01-01 01:09:46,068 [INFO] Connected to database
+2026-01-01 01:31:13,252 [ERROR] Database error: could not receive data from server: Network is down
+
+2026-01-01 01:31:18,559 [INFO] Connected to database
+2026-01-01 01:48:45,893 [ERROR] Database error: could not receive data from server: Network is down
+
+2026-01-01 01:48:51,195 [INFO] Connected to database
+2026-01-01 02:05:25,583 [ERROR] Database error: could not receive data from server: Operation timed out
+
+2026-01-01 02:05:31,252 [INFO] Connected to database
+2026-01-01 02:39:38,013 [ERROR] Database error: could not receive data from server: Network is down
+
+2026-01-01 02:39:43,322 [INFO] Connected to database
+2026-01-01 02:55:50,766 [ERROR] Database error: could not receive data from server: Operation timed out
+
+2026-01-01 02:55:56,064 [INFO] Connected to database
+2026-01-01 03:12:29,028 [ERROR] Database error: could not receive data from server: Operation timed out
+
+2026-01-01 03:12:34,359 [INFO] Connected to database
+2026-01-01 03:28:34,653 [ERROR] Database error: could not receive data from server: Operation timed out
+
+2026-01-01 03:28:39,948 [INFO] Connected to database
+2026-01-01 03:44:55,090 [ERROR] Database error: could not receive data from server: Operation timed out
+
+2026-01-01 03:45:00,390 [INFO] Connected to database
+2026-01-01 04:03:11,644 [ERROR] Database error: could not receive data from server: Operation timed out
+
+2026-01-01 04:03:16,943 [INFO] Connected to database
+2026-01-01 04:19:03,065 [ERROR] Database error: could not receive data from server: Operation timed out
+
+2026-01-01 04:19:08,368 [INFO] Connected to database
+2026-01-01 04:35:59,010 [ERROR] Database error: could not receive data from server: Network is down
+
+2026-01-01 04:36:04,302 [INFO] Connected to database
+2026-01-01 04:52:35,511 [ERROR] Database error: could not receive data from server: Operation timed out
+
+2026-01-01 04:52:40,817 [INFO] Connected to database
+2026-01-01 05:09:18,929 [ERROR] Database error: could not receive data from server: Operation timed out
+
+2026-01-01 05:09:24,229 [INFO] Connected to database
+2026-01-01 05:25:43,814 [ERROR] Database error: could not receive data from server: Network is down
+
+2026-01-01 05:25:49,169 [INFO] Connected to database
+2026-01-01 05:41:49,756 [ERROR] Database error: could not receive data from server: Operation timed out
+
+2026-01-01 05:41:55,058 [INFO] Connected to database
+2026-01-01 05:58:54,501 [ERROR] Database error: could not receive data from server: Operation timed out
+
+2026-01-01 05:58:59,807 [INFO] Connected to database
+2026-01-01 06:17:03,044 [ERROR] Database error: could not receive data from server: Network is down
+
+2026-01-01 06:17:08,352 [INFO] Connected to database
+2026-01-01 06:35:30,261 [ERROR] Database error: could not receive data from server: Network is down
+
+2026-01-01 06:35:35,565 [INFO] Connected to database
+2026-01-01 06:52:06,960 [ERROR] Database error: could not receive data from server: Network is down
+
+2026-01-01 06:52:12,246 [INFO] Connected to database
+2026-01-01 07:08:24,144 [ERROR] Database error: could not receive data from server: Operation timed out
+
+2026-01-01 07:08:29,461 [INFO] Connected to database
+2026-01-01 07:25:05,681 [ERROR] Database error: could not receive data from server: Operation timed out
+
+2026-01-01 07:25:10,984 [INFO] Connected to database
+2026-01-01 07:41:26,189 [ERROR] Database error: could not receive data from server: Operation timed out
+
+2026-01-01 07:41:31,539 [INFO] Connected to database
+2026-01-01 07:58:34,245 [ERROR] Database error: could not receive data from server: Network is down
+
+2026-01-01 07:58:39,547 [INFO] Connected to database
+2026-01-01 08:19:47,622 [ERROR] Database error: could not receive data from server: Operation timed out
+
+2026-01-01 08:19:52,926 [INFO] Connected to database
+2026-01-01 08:36:32,112 [ERROR] Database error: could not receive data from server: Network is down
+
+2026-01-01 08:36:37,429 [INFO] Connected to database
+2026-01-01 08:52:30,031 [ERROR] Database error: could not receive data from server: Operation timed out
+
+2026-01-01 08:52:35,336 [INFO] Connected to database
+2026-01-01 09:02:20,487 [ERROR] Database error: could not receive data from server: Operation timed out
+
+2026-01-01 09:02:25,806 [INFO] Connected to database
+2026-01-01 09:18:46,770 [ERROR] Database error: could not receive data from server: Operation timed out
+
+2026-01-01 09:18:52,074 [INFO] Connected to database
+2026-01-01 09:34:53,111 [ERROR] Database error: could not receive data from server: Network is down
+
+2026-01-01 09:34:58,423 [INFO] Connected to database
+2026-01-01 09:51:26,858 [ERROR] Database error: could not receive data from server: Operation timed out
+
+2026-01-01 09:51:32,157 [INFO] Connected to database
+2026-01-01 10:03:19,101 [ERROR] Database error: could not receive data from server: Network is down
+
+2026-01-01 10:03:24,424 [INFO] Connected to database
+2026-01-01 10:19:33,244 [ERROR] Database error: could not receive data from server: Operation timed out
+
+2026-01-01 10:19:38,590 [INFO] Connected to database
+2026-01-01 10:37:17,151 [ERROR] Database error: could not receive data from server: Operation timed out
+
+2026-01-01 10:37:22,441 [INFO] Connected to database
+2026-01-01 10:53:01,171 [ERROR] Database error: could not receive data from server: Network is down
+
+2026-01-01 10:53:06,465 [INFO] Connected to database
+2026-01-01 11:04:25,963 [ERROR] Database error: could not receive data from server: Network is down
+
+2026-01-01 11:04:31,306 [INFO] Connected to database
+2026-01-01 11:23:20,127 [ERROR] Database error: could not receive data from server: Network is down
+
+2026-01-01 11:23:25,417 [INFO] Connected to database
+2026-01-01 11:40:19,770 [ERROR] Database error: could not receive data from server: Network is down
+
+2026-01-01 11:40:25,097 [INFO] Connected to database
+2026-01-01 11:57:05,665 [ERROR] Database error: could not receive data from server: Operation timed out
+
+2026-01-01 11:57:11,054 [INFO] Connected to database
+2026-01-01 12:23:35,061 [ERROR] Database error: could not receive data from server: Operation timed out
+
+2026-01-01 12:23:40,357 [INFO] Connected to database
+2026-01-01 12:45:04,574 [ERROR] Database error: could not receive data from server: Network is down
+
+2026-01-01 12:45:10,672 [INFO] Connected to database
+2026-01-01 13:06:45,063 [ERROR] Database error: could not receive data from server: Operation timed out
+
+2026-01-01 13:22:36,146 [ERROR] Database error: connection to server at "135.181.90.4", port 5432 failed: Network is down
 	Is the server running on that host and accepting TCP/IP connections?
 
-2025-12-31 06:55:10,463 [INFO] Connected to database
-2025-12-31 07:11:12,528 [ERROR] Database error: could not receive data from server: Operation timed out
+2026-01-01 13:22:45,456 [INFO] Connected to database
+2026-01-01 13:47:25,903 [ERROR] Database error: could not receive data from server: Network is down
 
-2025-12-31 07:11:17,849 [INFO] Connected to database
-2025-12-31 07:29:00,699 [ERROR] Database error: could not receive data from server: Network is down
+2026-01-01 13:47:31,215 [INFO] Connected to database
+2026-01-01 14:03:30,626 [ERROR] Database error: could not receive data from server: Operation timed out
 
-2025-12-31 07:29:05,999 [INFO] Connected to database
-2025-12-31 07:45:08,858 [ERROR] Database error: could not receive data from server: Network is down
+2026-01-01 14:03:35,920 [INFO] Connected to database
+2026-01-01 14:42:46,376 [INFO] Processing job 788b5898-1c33-4851-b6a8-7c3e827b6ce9 (type: outlier_search)
+6-01-01 08:36:39,544 [INFO] Connected to database
+2026-01-01 08:52:31,234 [ERROR] Database error: could not receive data from server: Network is down
 
-2025-12-31 07:45:14,178 [INFO] Connected to database
-2025-12-31 08:02:19,389 [ERROR] Database error: could not receive data from server: Operation timed out
+2026-01-01 08:52:36,543 [INFO] Connected to database
+2026-01-01 09:02:19,728 [ERROR] Database error: could not receive data from server: Network is down
 
-2025-12-31 08:02:24,712 [INFO] Connected to database
-2025-12-31 08:19:26,598 [ERROR] Database error: could not receive data from server: Network is down
+2026-01-01 09:02:25,036 [INFO] Connected to database
+2026-01-01 09:18:48,011 [ERROR] Database error: could not receive data from server: Operation timed out
 
-2025-12-31 08:19:31,941 [INFO] Connected to database
-2025-12-31 08:36:22,929 [ERROR] Database error: could not receive data from server: Operation timed out
+2026-01-01 09:18:53,359 [INFO] Connected to database
+2026-01-01 09:34:55,319 [ERROR] Database error: could not receive data from server: Network is down
 
-2025-12-31 08:36:28,257 [INFO] Connected to database
-2025-12-31 08:54:13,309 [ERROR] Database error: could not receive data from server: Network is down
+2026-01-01 09:35:00,705 [INFO] Connected to database
+2026-01-01 09:51:30,388 [ERROR] Database error: could not receive data from server: Network is down
 
-2025-12-31 08:54:18,605 [INFO] Connected to database
-2025-12-31 09:03:21,318 [ERROR] Database error: could not receive data from server: Network is down
+2026-01-01 09:51:35,728 [INFO] Connected to database
+2026-01-01 10:03:21,417 [ERROR] Database error: could not receive data from server: Operation timed out
 
-2025-12-31 09:03:26,631 [INFO] Connected to database
-2025-12-31 09:42:13,086 [ERROR] Database error: could not receive data from server: Network is down
+2026-01-01 10:03:26,751 [INFO] Connected to database
+2026-01-01 10:19:35,399 [ERROR] Database error: could not receive data from server: Network is down
 
-2025-12-31 09:42:18,405 [INFO] Connected to database
-2025-12-31 09:59:30,448 [ERROR] Database error: could not receive data from server: Operation timed out
+2026-01-01 10:19:40,763 [INFO] Connected to database
+2026-01-01 10:37:12,411 [ERROR] Database error: could not receive data from server: Network is down
 
-2025-12-31 09:59:37,011 [INFO] Connected to database
-2025-12-31 10:21:21,844 [ERROR] Database error: could not receive data from server: Network is down
+2026-01-01 10:37:17,726 [INFO] Connected to database
+2026-01-01 10:53:06,368 [ERROR] Database error: could not receive data from server: Network is down
 
-2025-12-31 10:21:27,159 [INFO] Connected to database
-2025-12-31 10:40:15,859 [ERROR] Database error: could not receive data from server: Operation timed out
+2026-01-01 10:53:11,667 [INFO] Connected to database
+2026-01-01 11:04:19,802 [ERROR] Database error: could not receive data from server: Network is down
 
-2025-12-31 10:40:21,164 [INFO] Connected to database
-2025-12-31 10:58:09,931 [ERROR] Database error: could not receive data from server: Network is down
+2026-01-01 11:04:25,121 [INFO] Connected to database
+2026-01-01 11:23:18,478 [ERROR] Database error: could not receive data from server: Network is down
 
-2025-12-31 10:58:15,587 [INFO] Connected to database
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    2025-12-30 22:13:29,777 [INFO] Processing job a348540f-31e6-41bd-afe5-a682921f40dc (type: pose_analyze)
-2025-12-30 22:13:30,194 [INFO] HTTP Request: GET https://supabasekong-og0w4c0soc048kkc0gkcs8ow.vizr.cc/rest/v1/headshots?select=%2A&id=eq.4a5f163d-8690-4eba-8f4c-947732db2f92 "HTTP/2 200 OK"
-2025-12-30 22:13:30,195 [INFO] Downloading headshot from user-headshots/54c452c9-040a-46eb-b95e-90356201f355/1767126996617-1.jpg
-2025-12-30 22:13:30,794 [INFO] HTTP Request: GET https://supabasekong-og0w4c0soc048kkc0gkcs8ow.vizr.cc/storage/v1/object/user-headshots/54c452c9-040a-46eb-b95e-90356201f355/1767126996617-1.jpg "HTTP/2 200 OK"
-2025-12-30 22:13:31,673 [INFO] Analyzing face pose
-2025-12-30 22:13:31,694 [INFO] Pose: yaw=-33.9, pitch=-177.5, bucket=up-right
-2025-12-30 22:13:32,029 [INFO] HTTP Request: PATCH https://supabasekong-og0w4c0soc048kkc0gkcs8ow.vizr.cc/rest/v1/headshots?id=eq.4a5f163d-8690-4eba-8f4c-947732db2f92 "HTTP/2 200 OK"
-2025-12-30 22:13:32,380 [INFO] Job a348540f-31e6-41bd-afe5-a682921f40dc completed successfully
-2025-12-30 22:34:28,170 [ERROR] Database error: could not receive data from server: Operation timed out
+2026-01-01 11:23:23,815 [INFO] Connected to database
+2026-01-01 11:40:23,969 [ERROR] Database error: could not receive data from server: Network is down
 
-2025-12-30 22:34:33,729 [INFO] Connected to database
-2025-12-30 22:51:33,979 [ERROR] Database error: could not receive data from server: Network is down
+2026-01-01 11:40:29,308 [INFO] Connected to database
+2026-01-01 11:57:04,261 [ERROR] Database error: could not receive data from server: Network is down
 
-2025-12-30 22:51:39,277 [INFO] Connected to database
-2025-12-30 23:09:12,402 [ERROR] Database error: could not receive data from server: Network is down
+2026-01-01 11:57:09,608 [INFO] Connected to database
+2026-01-01 12:23:38,506 [ERROR] Database error: could not receive data from server: Network is down
 
-2025-12-30 23:09:17,708 [INFO] Connected to database
-2025-12-30 23:27:22,069 [ERROR] Database error: could not receive data from server: Operation timed out
+2026-01-01 12:23:43,829 [INFO] Connected to database
+2026-01-01 12:45:06,286 [ERROR] Database error: could not receive data from server: Operation timed out
 
-2025-12-30 23:27:27,433 [INFO] Connected to database
-2025-12-30 23:44:11,540 [ERROR] Database error: could not receive data from server: Operation timed out
+2026-01-01 12:45:12,511 [INFO] Connected to database
+2026-01-01 13:22:40,117 [ERROR] Database error: could not receive data from server: Network is down
 
-2025-12-30 23:44:16,829 [INFO] Connected to database
-2025-12-31 00:00:45,582 [ERROR] Database error: could not receive data from server: Network is down
+2026-01-01 13:22:45,417 [INFO] Connected to database
+2026-01-01 13:47:28,873 [ERROR] Database error: could not receive data from server: Network is down
 
-2025-12-31 00:00:50,891 [INFO] Connected to database
-2025-12-31 00:17:48,438 [ERROR] Database error: could not receive data from server: Operation timed out
+2026-01-01 13:47:34,232 [INFO] Connected to database
+2026-01-01 14:02:31,089 [ERROR] Database error: could not receive data from server: Network is down
 
-2025-12-31 00:17:53,738 [INFO] Connected to database
-2025-12-31 00:33:52,416 [ERROR] Database error: could not receive data from server: Network is down
+2026-01-01 14:02:36,404 [INFO] Connected to database
+2026-01-01 14:16:31,681 [INFO] Processing job 498028bf-12ee-4c99-b7d6-d070e9532fad (type: deep_research)
+2026-01-01 14:17:54,849 [INFO] Processing job a2396e34-861b-44e7-816d-1005feb16a27 (type: deep_research)
+2026-01-01 14:25:40,728 [INFO] Processing job 356e57b1-298f-4764-ad80-7f7f4cebe1b6 (type: deep_research)
+2026-01-01 14:28:47,917 [INFO] Processing job aebc0674-8a43-4ea6-809c-b077276ff209 (type: deep_research)
+2026-01-01 14:32:52,903 [INFO] Processing job cf33334c-a6e8-4a8d-bfb1-92d432dbf234 (type: deep_research)
+2026-01-01 14:36:00,087 [INFO] Processing job 48f28f28-88eb-4d69-bd60-1d6c0422c05c (type: deep_research)
+2026-01-01 14:42:22,666 [INFO] Processing job 4a034c31-0ef5-4eae-8318-e6f5b2cf0f44 (type: deep_research)
+ 14:03:48,283 [ERROR] Database error: could not receive data from server: Operation timed out
 
-2025-12-31 00:33:57,718 [INFO] Connected to database
-2025-12-31 00:50:00,875 [ERROR] Database error: could not receive data from server: Operation timed out
+2026-01-01 14:03:53,602 [INFO] Connected to database
+2026-01-01 14:14:02,925 [INFO] Processing job 92f37174-390f-44a4-bc5f-e77a24848510 (type: deep_research)
+2026-01-01 14:22:03,459 [INFO] Processing job 4bc855f1-75af-4960-ab0e-2c41a66b717c (type: deep_research)
+2026-01-01 16:25:35,593 [INFO] Processing job ee030f00-144c-47a9-9b18-6cfcc9dc6852 (type: video_process)
+2026-01-01 16:25:35,795 [INFO] HTTP Request: GET https://supabasekong-og0w4c0soc048kkc0gkcs8ow.vizr.cc/rest/v1/project_assets?select=%2A&id=eq.435f7242-7c36-4bab-b183-8e62fec7bca8 "HTTP/2 200 OK"
+2026-01-01 16:25:35,797 [INFO] Downloading video from project-raw-videos/54c452c9-040a-46eb-b95e-90356201f355/d20cf5fe-af6a-4a14-810d-e64fca034584/1767281027742.mp4
+2026-01-01 16:25:36,245 [INFO] HTTP Request: GET https://supabasekong-og0w4c0soc048kkc0gkcs8ow.vizr.cc/storage/v1/object/project-raw-videos/54c452c9-040a-46eb-b95e-90356201f355/d20cf5fe-af6a-4a14-810d-e64fca034584/1767281027742.mp4 "HTTP/2 200 OK"
+2026-01-01 16:32:13,757 [ERROR] Video processing failed
+Traceback (most recent call last):
+  File "/Users/hc/Documents/GitHub/Vibe---Youtube-Workflow/workers/media/handlers/video_process.py", line 53, in process
+    original_duration = self._get_duration(input_path)
+  File "/Users/hc/Documents/GitHub/Vibe---Youtube-Workflow/workers/media/handlers/video_process.py", line 166, in _get_duration
+    result = subprocess.run(
+  File "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/subprocess.py", line 505, in run
+    with Popen(*popenargs, **kwargs) as process:
+  File "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/subprocess.py", line 951, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+  File "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/subprocess.py", line 1821, in _execute_child
+    raise child_exception_type(errno_num, err_msg, err_filename)
+FileNotFoundError: [Errno 2] No such file or directory: 'ffprobe'
+2026-01-01 16:32:13,935 [ERROR] Job ee030f00-144c-47a9-9b18-6cfcc9dc6852 failed: [Errno 2] No such file or directory: 'ffprobe'
+2026-01-01 16:33:08,466 [ERROR] Database error: could not receive data from server: Operation timed out
 
-2025-12-31 00:50:06,165 [INFO] Connected to database
-2025-12-31 01:05:54,697 [ERROR] Database error: could not receive data from server: Network is down
+2026-01-01 16:33:13,783 [INFO] Connected to database
+2026-01-01 18:01:10,768 [INFO] Processing job 66d848eb-79fa-4a16-84d8-a9d0bafadd9f (type: video_process)
+2026-01-01 18:01:10,994 [INFO] HTTP Request: GET https://supabasekong-og0w4c0soc048kkc0gkcs8ow.vizr.cc/rest/v1/project_assets?select=%2A&id=eq.fcc73b9b-5d2f-4314-a435-5b4a8a3f9bb9 "HTTP/2 200 OK"
+2026-01-01 18:01:10,995 [INFO] Downloading video from project-raw-videos/54c452c9-040a-46eb-b95e-90356201f355/ff14f0b3-06f1-45a5-b768-653633204696/1767286856592.mp4
+2026-01-01 18:01:11,566 [INFO] HTTP Request: GET https://supabasekong-og0w4c0soc048kkc0gkcs8ow.vizr.cc/storage/v1/object/project-raw-videos/54c452c9-040a-46eb-b95e-90356201f355/ff14f0b3-06f1-45a5-b768-653633204696/1767286856592.mp4 "HTTP/2 200 OK"
+2026-01-01 18:01:41,110 [ERROR] Video processing failed
+Traceback (most recent call last):
+  File "/Users/hc/Documents/GitHub/Vibe---Youtube-Workflow/workers/media/handlers/video_process.py", line 53, in process
+    input_path = os.path.join(self.temp_dir, f"{job_id}_input.mp4")
+  File "/Users/hc/Documents/GitHub/Vibe---Youtube-Workflow/workers/media/handlers/video_process.py", line 166, in _get_duration
+    logger.warning(f"Intro transition failed: {intro_result.get('error')}")
+  File "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/subprocess.py", line 505, in run
+    with Popen(*popenargs, **kwargs) as process:
+  File "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/subprocess.py", line 951, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+  File "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/subprocess.py", line 1821, in _execute_child
+    raise child_exception_type(errno_num, err_msg, err_filename)
+FileNotFoundError: [Errno 2] No such file or directory: 'ffprobe'
+2026-01-01 18:01:41,302 [ERROR] Job 66d848eb-79fa-4a16-84d8-a9d0bafadd9f failed: [Errno 2] No such file or directory: 'ffprobe'
+nected to database
+2026-01-01 08:52:42,115 [ERROR] Database error: could not receive data from server: Network is down
 
-2025-12-31 01:06:00,004 [INFO] Connected to database
-2025-12-31 01:19:29,562 [ERROR] Database error: could not receive data from server: Operation timed out
+2026-01-01 08:52:47,419 [INFO] Connected to database
+2026-01-01 09:02:19,158 [ERROR] Database error: could not receive data from server: Network is down
 
-2025-12-31 01:19:34,895 [INFO] Connected to database
-2025-12-31 01:37:03,049 [ERROR] Database error: could not receive data from server: Network is down
+2026-01-01 09:02:24,505 [INFO] Connected to database
+2026-01-01 09:18:41,356 [ERROR] Database error: could not receive data from server: Operation timed out
 
-2025-12-31 01:37:08,348 [INFO] Connected to database
-2025-12-31 01:56:19,268 [ERROR] Database error: could not receive data from server: Network is down
+2026-01-01 09:18:46,679 [INFO] Connected to database
+2026-01-01 09:34:56,376 [ERROR] Database error: could not receive data from server: Network is down
 
-2025-12-31 01:56:24,573 [INFO] Connected to database
-2025-12-31 02:12:27,228 [ERROR] Database error: could not receive data from server: Network is down
+2026-01-01 09:35:01,676 [INFO] Connected to database
+2026-01-01 09:51:28,276 [ERROR] Database error: could not receive data from server: Network is down
 
-2025-12-31 02:12:32,539 [INFO] Connected to database
-2025-12-31 02:29:29,408 [ERROR] Database error: could not receive data from server: Network is down
+2026-01-01 09:51:33,590 [INFO] Connected to database
+2026-01-01 10:03:22,451 [ERROR] Database error: could not receive data from server: Network is down
 
-2025-12-31 02:29:34,773 [INFO] Connected to database
-2025-12-31 02:45:53,124 [ERROR] Database error: could not receive data from server: Operation timed out
+2026-01-01 10:03:27,773 [INFO] Connected to database
+2026-01-01 10:19:32,428 [ERROR] Database error: could not receive data from server: Network is down
 
-2025-12-31 02:45:58,503 [INFO] Connected to database
-2025-12-31 03:02:05,027 [ERROR] Database error: could not receive data from server: Network is down
+2026-01-01 10:19:37,730 [INFO] Connected to database
+2026-01-01 10:37:09,464 [ERROR] Database error: could not receive data from server: Operation timed out
 
-2025-12-31 03:02:10,348 [INFO] Connected to database
-2025-12-31 03:23:55,889 [ERROR] Database error: could not receive data from server: Operation timed out
+2026-01-01 10:37:14,801 [INFO] Connected to database
+2026-01-01 10:53:03,480 [ERROR] Database error: could not receive data from server: Operation timed out
 
-2025-12-31 03:24:02,259 [INFO] Connected to database
-2025-12-31 03:41:21,549 [ERROR] Database error: could not receive data from server: Operation timed out
+2026-01-01 10:53:08,810 [INFO] Connected to database
+2026-01-01 11:04:33,055 [ERROR] Database error: could not receive data from server: Operation timed out
 
-2025-12-31 03:41:26,853 [INFO] Connected to database
-2025-12-31 03:57:54,942 [ERROR] Database error: could not receive data from server: Operation timed out
+2026-01-01 11:04:38,376 [INFO] Connected to database
+2026-01-01 11:23:22,080 [ERROR] Database error: could not receive data from server: Operation timed out
 
-2025-12-31 03:58:00,267 [INFO] Connected to database
-2025-12-31 04:14:23,705 [ERROR] Database error: could not receive data from server: Operation timed out
+2026-01-01 11:23:27,393 [INFO] Connected to database
+2026-01-01 11:40:23,969 [ERROR] Database error: could not receive data from server: Network is down
 
-2025-12-31 04:14:28,993 [INFO] Connected to database
-2025-12-31 04:30:46,637 [ERROR] Database error: could not receive data from server: Network is down
+2026-01-01 11:40:29,305 [INFO] Connected to database
+2026-01-01 11:57:06,263 [ERROR] Database error: could not receive data from server: Network is down
 
-2025-12-31 04:30:51,944 [INFO] Connected to database
-2025-12-31 04:47:11,495 [ERROR] Database error: could not receive data from server: Network is down
+2026-01-01 11:57:11,614 [INFO] Connected to database
+2026-01-01 12:23:33,204 [ERROR] Database error: could not receive data from server: Operation timed out
 
-2025-12-31 04:47:16,803 [INFO] Connected to database
-2025-12-31 05:04:44,085 [ERROR] Database error: could not receive data from server: Network is down
+2026-01-01 12:23:38,494 [INFO] Connected to database
+2026-01-01 12:45:03,971 [ERROR] Database error: could not receive data from server: Network is down
 
-2025-12-31 05:04:49,404 [INFO] Connected to database
-2025-12-31 05:21:40,978 [ERROR] Database error: could not receive data from server: Operation timed out
+2026-01-01 12:45:10,420 [INFO] Connected to database
+2026-01-01 13:22:53,991 [ERROR] Database error: could not receive data from server: Operation timed out
 
-2025-12-31 05:21:46,280 [INFO] Connected to database
-2025-12-31 05:37:48,938 [ERROR] Database error: could not receive data from server: Network is down
+2026-01-01 13:22:59,294 [INFO] Connected to database
+2026-01-01 13:47:22,988 [ERROR] Database error: could not receive data from server: Network is down
 
-2025-12-31 05:37:54,254 [INFO] Connected to database
-2025-12-31 05:54:19,620 [ERROR] Database error: could not receive data from server: Network is down
+2026-01-01 13:47:28,477 [INFO] Connected to database
+2026-01-01 14:02:08,199 [ERROR] Database error: could not receive data from server: Operation timed out
 
-2025-12-31 05:54:24,920 [INFO] Connected to database
-2025-12-31 06:17:40,131 [ERROR] Database error: could not receive data from server: Operation timed out
-
-2025-12-31 06:17:49,526 [INFO] Connected to database
-2025-12-31 06:55:05,209 [ERROR] Database error: could not receive data from server: Network is down
-
-2025-12-31 06:55:10,518 [INFO] Connected to database
-2025-12-31 07:11:12,439 [ERROR] Database error: could not receive data from server: Operation timed out
-
-2025-12-31 07:11:17,787 [INFO] Connected to database
-2025-12-31 07:28:56,339 [ERROR] Database error: could not receive data from server: Network is down
-
-2025-12-31 07:29:01,650 [INFO] Connected to database
-2025-12-31 07:45:04,458 [ERROR] Database error: could not receive data from server: Operation timed out
-
-2025-12-31 07:45:09,811 [INFO] Connected to database
-2025-12-31 08:02:32,606 [ERROR] Database error: could not receive data from server: Network is down
-
-2025-12-31 08:02:37,914 [INFO] Connected to database
-2025-12-31 08:19:35,589 [ERROR] Database error: could not receive data from server: Operation timed out
-
-2025-12-31 08:19:40,951 [INFO] Connected to database
-2025-12-31 08:36:25,829 [ERROR] Database error: could not receive data from server: Network is down
-
-2025-12-31 08:36:31,230 [INFO] Connected to database
-2025-12-31 08:54:27,783 [ERROR] Database error: could not receive data from server: Network is down
-
-2025-12-31 08:54:33,089 [INFO] Connected to database
-2025-12-31 09:03:20,815 [ERROR] Database error: could not receive data from server: Network is down
-
-2025-12-31 09:03:26,390 [INFO] Connected to database
-2025-12-31 09:42:09,861 [ERROR] Database error: could not receive data from server: Operation timed out
-
-2025-12-31 09:42:18,188 [INFO] Connected to database
-2025-12-31 09:59:36,574 [ERROR] Database error: could not receive data from server: Operation timed out
-
-2025-12-31 09:59:41,946 [INFO] Connected to database
-2025-12-31 10:21:28,079 [ERROR] Database error: could not receive data from server: Network is down
-
-2025-12-31 10:21:33,397 [INFO] Connected to database
-2025-12-31 10:40:20,078 [ERROR] Database error: could not receive data from server: Operation timed out
-
-2025-12-31 10:40:25,402 [INFO] Connected to database
-2025-12-31 10:58:05,739 [ERROR] Database error: could not receive data from server: Network is down
-
-2025-12-31 10:58:11,603 [INFO] Connected to database
+2026-01-01 14:02:13,519 [INFO] Connected to database

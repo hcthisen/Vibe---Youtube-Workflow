@@ -1,5 +1,7 @@
 # YouTube Production Assistant
 
+> **📘 For AI Agents**: Please read [AGENTS.md](AGENTS.md) first for comprehensive database access instructions, environment setup, and development workflows.
+
 A web app that helps creators research YouTube video ideas, edit talking-head videos (silence removal), generate transcripts, and create AI-powered thumbnails.
 
 ## Tech Stack

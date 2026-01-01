@@ -17,12 +17,33 @@ export default async function IdeasPage({
     return null;
   }
 
-  const { data: savedIdeas } = await supabase
+  // Fetch ideas with their related videos
+  const { data: savedIdeas, error: ideasError } = await supabase
     .from("ideas")
     .select("*, videos(*)")
     .eq("user_id", user.id)
-    .eq("status", "saved")
+    .in("status", ["saved", "project_created"])
     .order("created_at", { ascending: false });
+
+  if (ideasError) {
+    console.error("Error fetching ideas:", ideasError);
+  }
+
+  // Fetch projects for these ideas
+  const ideaIds = savedIdeas?.map((idea) => idea.id) || [];
+  const { data: projects } = ideaIds.length > 0
+    ? await supabase
+        .from("projects")
+        .select("*")
+        .eq("user_id", user.id)
+        .in("idea_id", ideaIds)
+    : { data: null };
+
+  // Merge projects into ideas
+  const ideasWithProjects = savedIdeas?.map((idea) => ({
+    ...idea,
+    projects: projects?.find((p) => p.idea_id === idea.id) || null,
+  })) || [];
 
   const { data: channel } = await supabase
     .from("channels")
@@ -36,7 +57,7 @@ export default async function IdeasPage({
   const tabs = [
     { id: "outliers", label: "Outlier Search" },
     { id: "research", label: "Deep Research" },
-    { id: "saved", label: `Saved Ideas (${savedIdeas?.length || 0})` },
+    { id: "saved", label: `Saved Ideas (${ideasWithProjects?.length || 0})` },
   ];
 
   return (
@@ -78,7 +99,7 @@ export default async function IdeasPage({
           baselineKeywords={(channel?.baseline_keywords as string[]) || []}
         />
       )}
-      {activeTab === "saved" && <SavedIdeas ideas={savedIdeas || []} />}
+      {activeTab === "saved" && <SavedIdeas ideas={ideasWithProjects || []} />}
     </div>
   );
 }

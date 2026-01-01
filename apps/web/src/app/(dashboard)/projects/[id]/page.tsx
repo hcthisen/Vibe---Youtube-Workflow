@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect, notFound } from "next/navigation";
 import { ProjectHeader } from "@/components/projects/ProjectHeader";
+import { IdeaBrief } from "@/components/projects/IdeaBrief";
 import { OutlineEditor } from "@/components/projects/OutlineEditor";
 import { VideoUploader } from "@/components/projects/VideoUploader";
 import { VideoPlayer } from "@/components/projects/VideoPlayer";
@@ -55,6 +56,7 @@ export default async function ProjectPage({
 
   // Check for running jobs
   const runningJob = jobs?.find((j) => j.status === "running" || j.status === "queued");
+  const failedJob = jobs?.find((j) => j.status === "failed");
 
   return (
     <div className="space-y-8">
@@ -63,6 +65,14 @@ export default async function ProjectPage({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Idea Brief Section */}
+          {project.idea_brief_markdown && (
+            <IdeaBrief
+              projectId={project.id}
+              markdown={project.idea_brief_markdown}
+            />
+          )}
+
           {/* Outline Section */}
           <section className="bg-gray-800/30 border border-gray-700 rounded-xl p-6">
             <OutlineEditor
@@ -86,14 +96,21 @@ export default async function ProjectPage({
                   Job status: {runningJob.status}
                 </p>
               </div>
-            ) : processedVideo ? (
-              <VideoPlayer asset={processedVideo} />
-            ) : rawVideo ? (
-              <div className="text-center py-8">
-                <p className="text-gray-400">
-                  Raw video uploaded. Processing will begin shortly.
-                </p>
+            ) : failedJob ? (
+              <div className="space-y-4">
+                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
+                  <p className="text-red-400 font-medium mb-2">Processing Failed</p>
+                  <p className="text-sm text-gray-400">{failedJob.error || "Unknown error"}</p>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Job ID: {failedJob.id}
+                  </p>
+                </div>
+                {rawVideo && (
+                  <VideoPlayer rawAsset={rawVideo} processedAsset={processedVideo} />
+                )}
               </div>
+            ) : rawVideo || processedVideo ? (
+              <VideoPlayer rawAsset={rawVideo} processedAsset={processedVideo} />
             ) : (
               <VideoUploader projectId={project.id} />
             )}
