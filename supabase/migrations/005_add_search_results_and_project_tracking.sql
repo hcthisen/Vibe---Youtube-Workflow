@@ -72,3 +72,4 @@ CREATE TRIGGER update_search_results_updated_at
 -- since search results are immutable once created
 
 
+

@@ -17,3 +17,4 @@ fetch('http://127.0.0.1:7242/ingest/18d926b1-f741-4713-b147-77616fe448c6',{metho
 console.log("✅ Environment variables loaded");
 
 
+

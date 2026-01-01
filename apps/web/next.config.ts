@@ -3,8 +3,13 @@ import type { NextConfig } from "next";
 const supabaseHostname = (() => {
   try {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    return url ? new URL(url).hostname : null;
-  } catch {
+    if (!url) {
+      console.warn('NEXT_PUBLIC_SUPABASE_URL is not set');
+      return null;
+    }
+    return new URL(url).hostname;
+  } catch (error) {
+    console.warn('Failed to parse NEXT_PUBLIC_SUPABASE_URL:', error);
     return null;
   }
 })();

@@ -18,15 +18,17 @@ RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
 # Rebuild the source code only when needed
 FROM base AS builder
-WORKDIR /app
 
 # Declare build-time arguments for Next.js public env vars
+# Coolify will inject these automatically, but we declare them explicitly for clarity
 ARG NEXT_PUBLIC_SUPABASE_URL
 ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
 
 # Set them as environment variables so Next.js can embed them in the build
 ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
 ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/package.json ./package.json
@@ -37,7 +39,20 @@ COPY . .
 
 # Build Next.js
 WORKDIR /app/apps/web
-RUN npm run build
+
+# Debug: Print environment variables
+RUN echo "=== Build Environment ===" && \
+    echo "Node: $(node --version)" && \
+    echo "NPM: $(npm --version)" && \
+    echo "NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:0:30}..." && \
+    echo "========================"
+
+# Build Next.js (with verbose logging on failure)
+RUN npm run build 2>&1 || (echo "BUILD FAILED - Dumping details:" && \
+    ls -la && \
+    echo "--- next.config.ts ---" && cat next.config.ts && \
+    echo "--- package.json ---" && cat package.json && \
+    exit 1)
 
 # Production image, copy all the files and run next
 FROM base AS runner
