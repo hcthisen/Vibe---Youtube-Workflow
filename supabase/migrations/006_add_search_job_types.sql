@@ -44,3 +44,4 @@ CREATE INDEX IF NOT EXISTS idx_jobs_user_type_status
 COMMENT ON INDEX idx_jobs_queue IS 'Optimized for worker polling queued jobs';
 COMMENT ON INDEX idx_jobs_user_type_status IS 'Optimized for checking user concurrency limits';
 
+

@@ -71,3 +71,4 @@ CREATE TRIGGER update_search_results_updated_at
 -- Note: We add created_at tracking but search_results doesn't need updated_at
 -- since search results are immutable once created
 
+

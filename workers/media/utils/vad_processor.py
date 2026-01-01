@@ -6,7 +6,9 @@ Ported from Initial Templates - execution/jump_cut_vad.py
 import subprocess
 import tempfile
 import os
+import re
 import logging
+import shutil
 from typing import List, Tuple
 
 logger = logging.getLogger(__name__)
@@ -118,13 +120,62 @@ def add_padding(
 
 
 def get_duration(video_path: str) -> float:
-    """Get video duration in seconds."""
-    cmd = [
-        "ffprobe", "-v", "error", "-show_entries", "format=duration",
-        "-of", "default=noprint_wrappers=1:nokey=1", video_path
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-    return float(result.stdout.strip())
+    """Get video duration in seconds.
+
+    Tries `ffprobe` first (preferred). If `ffprobe` is unavailable, falls back to
+    parsing `ffmpeg` output.
+    """
+    ffprobe_path = shutil.which("ffprobe")
+    if ffprobe_path:
+        cmd = [
+            ffprobe_path,
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
+            video_path,
+        ]
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            return float(result.stdout.strip())
+        except subprocess.CalledProcessError as e:
+            details = (e.stderr or "").strip() or (e.stdout or "").strip() or str(e)
+            raise RuntimeError(f"ffprobe failed to read duration for '{video_path}': {details}")
+        except ValueError:
+            raise RuntimeError(
+                f"ffprobe returned a non-numeric duration for '{video_path}': {result.stdout!r}"
+            )
+
+    ffmpeg_path = shutil.which("ffmpeg")
+    if not ffmpeg_path:
+        raise RuntimeError(
+            "Required tool 'ffprobe' was not found (and 'ffmpeg' is also missing). "
+            "Install FFmpeg (includes ffprobe) and ensure it's on your PATH. "
+            "macOS (Homebrew): `brew install ffmpeg`."
+        )
+
+    # Fallback: parse the "Duration: HH:MM:SS.xx" line from ffmpeg output.
+    result = subprocess.run(
+        [ffmpeg_path, "-hide_banner", "-i", video_path],
+        capture_output=True,
+        text=True,
+    )
+    combined = f"{result.stderr or ''}\n{result.stdout or ''}"
+    match = re.search(r"Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)", combined)
+    if not match:
+        tail = "\n".join(combined.strip().splitlines()[-8:])
+        raise RuntimeError(
+            "Unable to determine video duration. 'ffprobe' is missing and parsing 'ffmpeg' output failed. "
+            "Ensure FFmpeg is installed and the input file is readable.\n"
+            f"ffmpeg output (tail):\n{tail}"
+        )
+
+    hours = int(match.group(1))
+    minutes = int(match.group(2))
+    seconds = float(match.group(3))
+    return hours * 3600 + minutes * 60 + seconds
 
 
 def concatenate_segments(
@@ -198,7 +249,10 @@ def process_video_vad(
     logger.info(f"Processing video with VAD: {input_path}")
     
     # Get video duration
-    duration = get_duration(input_path)
+    try:
+        duration = get_duration(input_path)
+    except Exception as e:
+        return {"success": False, "error": str(e)}
     logger.info(f"Video duration: {duration:.2f}s")
 
     # Extract audio for VAD
@@ -207,7 +261,28 @@ def process_video_vad(
 
     try:
         logger.info("Extracting audio...")
-        extract_audio(input_path, audio_path)
+        try:
+            extract_audio(input_path, audio_path)
+        except FileNotFoundError as e:
+            if e.filename in ("ffmpeg", "ffprobe"):
+                return {
+                    "success": False,
+                    "error": (
+                        f"Required tool '{e.filename}' was not found. Install FFmpeg (includes ffprobe) "
+                        "and ensure it's on your PATH. macOS (Homebrew): `brew install ffmpeg`."
+                    ),
+                }
+            return {"success": False, "error": str(e)}
+        except subprocess.CalledProcessError as e:
+            details = (
+                (e.stderr or b"").decode(errors="ignore")
+                if isinstance(e.stderr, (bytes, bytearray))
+                else (e.stderr or "")
+            )
+            return {
+                "success": False,
+                "error": f"ffmpeg failed while extracting audio: {details.strip() or str(e)}",
+            }
 
         # Run Silero VAD
         logger.info(f"Running Silero VAD (min_silence={min_silence}s, min_speech={min_speech}s)...")
@@ -245,10 +320,27 @@ def process_video_vad(
         logger.info("Preserving intro: extended first segment to start at 0:00")
 
     # Concatenate
-    concatenate_segments(input_path, speech_segments, output_path)
+    try:
+        concatenate_segments(input_path, speech_segments, output_path)
+    except FileNotFoundError as e:
+        if e.filename in ("ffmpeg", "ffprobe"):
+            return {
+                "success": False,
+                "error": (
+                    f"Required tool '{e.filename}' was not found. Install FFmpeg (includes ffprobe) "
+                    "and ensure it's on your PATH. macOS (Homebrew): `brew install ffmpeg`."
+                ),
+            }
+        return {"success": False, "error": str(e)}
+    except subprocess.CalledProcessError as e:
+        details = (e.stderr or b"").decode(errors="ignore") if isinstance(e.stderr, (bytes, bytearray)) else (e.stderr or "")
+        return {"success": False, "error": f"ffmpeg failed while cutting/concatenating: {details.strip() or str(e)}"}
 
     # Calculate stats
-    new_duration = get_duration(output_path)
+    try:
+        new_duration = get_duration(output_path)
+    except Exception as e:
+        return {"success": False, "error": str(e)}
     removed = duration - new_duration
 
     return {

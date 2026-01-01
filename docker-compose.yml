@@ -5,13 +5,32 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+      args:
+        # Needed at build-time for Next.js client bundles (Coolify should provide these)
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
     ports:
       - "3000:3000"
     environment:
       - NODE_ENV=production
       - NEXT_TELEMETRY_DISABLED=1
-    env_file:
-      - .env.production
+      # Pass-through required runtime env vars from Coolify
+      - NEXT_PUBLIC_SUPABASE_URL
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY
+      - SUPABASE_SERVICE_ROLE_KEY
+      - DATABASE_URL
+      # Optional integrations (only needed if you use the features)
+      - OPENAI_API_KEY
+      - OPENAI_MODEL_DEFAULT
+      - OPENAI_MODEL_FAST
+      - DATAFORSEO_LOGIN
+      - DATAFORSEO_PASSWORD
+      - GOOGLE_AI_STUDIO_API_KEY
+      - NANO_BANANA_MODEL
+      - NANO_BANANA_ENDPOINT
+      - WORKER_SHARED_SECRET
+      - WORKER_POLL_INTERVAL
+      - WORKER_TEMP_DIR
     depends_on:
       - worker
     restart: unless-stopped
@@ -28,13 +47,21 @@ services:
       dockerfile: workers/media/Dockerfile
     environment:
       - PYTHONUNBUFFERED=1
-    env_file:
-      - .env.production
+      # Pass-through required runtime env vars from Coolify
+      - DATABASE_URL
+      - NEXT_PUBLIC_SUPABASE_URL
+      - SUPABASE_SERVICE_ROLE_KEY
+      # Optional
+      - OPENAI_API_KEY
+      - WORKER_SHARED_SECRET
+      - WORKER_POLL_INTERVAL
+      - WORKER_TEMP_DIR
+      - WHISPER_MODEL
     volumes:
       - worker-temp:/tmp/yt-worker
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      test: ["CMD", "python", "-c", "import shutil, sys; sys.exit(0 if shutil.which('ffprobe') and shutil.which('ffmpeg') else 1)"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -45,11 +72,18 @@ services:
       dockerfile: workers/search-processor/Dockerfile
     environment:
       - NODE_ENV=production
-    env_file:
-      - .env.production
+      # Pass-through required runtime env vars from Coolify
+      - NEXT_PUBLIC_SUPABASE_URL
+      - SUPABASE_SERVICE_ROLE_KEY
+      # Optional integrations used by search tools
+      - OPENAI_API_KEY
+      - OPENAI_MODEL_DEFAULT
+      - OPENAI_MODEL_FAST
+      - DATAFORSEO_LOGIN
+      - DATAFORSEO_PASSWORD
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "pgrep", "-f", "worker.ts"]
+      test: ["CMD-SHELL", "ps | grep -q '[t]sx worker.ts'"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -58,9 +92,12 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+      # The builder stage contains the source + node_modules + tsx
+      target: builder
     command: npm run db:migrate
-    env_file:
-      - .env.production
+    working_dir: /app
+    environment:
+      - DATABASE_URL
     restart: "no"
     profiles:
       - migration

@@ -30,6 +30,7 @@ export function ProjectHeader({ project }: ProjectHeaderProps) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(project.title);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const status = STATUS_LABELS[project.status] || STATUS_LABELS.research;
 
@@ -52,9 +53,31 @@ export function ProjectHeader({ project }: ProjectHeaderProps) {
   const handleDelete = async () => {
     if (!confirm("Delete this project? This cannot be undone.")) return;
 
-    const supabase = createClient();
-    await supabase.from("projects").delete().eq("id", project.id);
-    router.push("/projects");
+    setDeleting(true);
+
+    try {
+      const response = await fetch(`/api/projects/${project.id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to delete project");
+      }
+
+      const data = await response.json();
+      
+      // Show warnings if some files failed to delete
+      if (data.warnings && data.warnings.length > 0) {
+        console.warn("Some storage files failed to delete:", data.warnings);
+      }
+
+      router.push("/projects");
+    } catch (error) {
+      console.error("Error deleting project:", error);
+      alert(error instanceof Error ? error.message : "Failed to delete project");
+      setDeleting(false);
+    }
   };
 
   const handleStatusChange = async (newStatus: string) => {
@@ -111,17 +134,22 @@ export function ProjectHeader({ project }: ProjectHeaderProps) {
 
         <button
           onClick={handleDelete}
-          className="p-2 text-gray-400 hover:text-red-400 transition-colors"
+          disabled={deleting}
+          className="p-2 text-gray-400 hover:text-red-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           title="Delete project"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-            />
-          </svg>
+          {deleting ? (
+            <div className="animate-spin w-5 h-5 border-2 border-red-400 border-t-transparent rounded-full" />
+          ) : (
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+              />
+            </svg>
+          )}
         </button>
       </div>
     </div>

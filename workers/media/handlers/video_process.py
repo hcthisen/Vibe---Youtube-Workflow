@@ -7,10 +7,10 @@ import logging
 from typing import Any, Dict
 
 from .base import BaseHandler
-from ..utils.vad_processor import process_video_vad
-from ..utils.transcription import transcribe_video, search_transcript_for_phrases, remove_segments_from_transcript
-from ..utils.llm_cuts import analyze_retake_cuts, apply_cuts_to_video
-from ..utils.intro_transition import add_intro_transition
+from utils.vad_processor import process_video_vad
+from utils.transcription import transcribe_video, search_transcript_for_phrases, remove_segments_from_transcript
+from utils.llm_cuts import analyze_retake_cuts, apply_cuts_to_video
+from utils.intro_transition import add_intro_transition
 
 logger = logging.getLogger(__name__)
 
@@ -35,15 +35,25 @@ class VideoProcessHandler(BaseHandler):
 
             logger.info(f"Starting video processing pipeline for asset {asset_id}")
 
-            # Get asset info
-            asset = self.supabase.table("project_assets").select("*").eq(
-                "id", asset_id
-            ).single().execute()
+            if not asset_id:
+                return {"success": False, "error": "Missing required input: asset_id"}
 
-            if not asset.data:
+            # Get asset info
+            asset_res = self.supabase.table("project_assets").select("*").eq(
+                "id", asset_id
+            ).execute()
+            asset_rows = asset_res.data or []
+
+            if len(asset_rows) == 0:
                 return {"success": False, "error": "Asset not found"}
 
-            asset_data = asset.data
+            if len(asset_rows) > 1:
+                return {
+                    "success": False,
+                    "error": f"Expected 1 asset row, found {len(asset_rows)} for asset_id={asset_id}",
+                }
+
+            asset_data = asset_rows[0]
             user_id = asset_data["user_id"]
             project_id = asset_data["project_id"]
             bucket = asset_data["bucket"]
@@ -141,7 +151,7 @@ class VideoProcessHandler(BaseHandler):
                                     current_video_path = cuts_output_path
                                     
                                     # Calculate new duration
-                                    from ..utils.vad_processor import get_duration
+                                    from utils.vad_processor import get_duration
                                     after_cuts_duration_ms = int(get_duration(cuts_output_path) * 1000)
                         else:
                             logger.warning("OPENAI_API_KEY not set - skipping LLM retake analysis")

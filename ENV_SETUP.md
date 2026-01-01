@@ -7,7 +7,7 @@ Run these commands to create your environment files:
 ### 1. Web App Environment
 
 ```bash
-cat > /Users/hc/.cursor/worktrees/Vibe---Youtube-Workflow/cfz/apps/web/.env.local << 'EOF'
+cat > apps/web/.env.local << 'EOF'
 # Supabase API Access
 NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
@@ -34,7 +34,7 @@ EOF
 ### 2. Media Worker Environment
 
 ```bash
-cat > /Users/hc/.cursor/worktrees/Vibe---Youtube-Workflow/cfz/workers/media/.env << 'EOF'
+cat > workers/media/.env << 'EOF'
 # Database
 DATABASE_URL=postgresql://postgres.your-project-id:your-password@host:6543/postgres
 
@@ -92,20 +92,20 @@ postgresql://postgres.abcdefghij:your-password@aws-0-us-west-1.pooler.supabase.c
 
 **Terminal 1: Web App**
 ```bash
-cd /Users/hc/.cursor/worktrees/Vibe---Youtube-Workflow/cfz/apps/web
+cd apps/web
 npm install
 npm run dev
 ```
 
 **Terminal 2: Media Worker**
 ```bash
-cd /Users/hc/.cursor/worktrees/Vibe---Youtube-Workflow/cfz/workers/media
+cd workers/media
 python3 worker.py
 ```
 
 **Terminal 3: Search Worker (optional)**
 ```bash
-cd /Users/hc/.cursor/worktrees/Vibe---Youtube-Workflow/cfz/workers/search-processor
+cd workers/search-processor
 npm install
 npm start
 ```
@@ -132,7 +132,7 @@ Once all services are running:
 ### "ImportError: attempted relative import beyond top-level package"
 
 → `utils/` folder is missing in workers/media
-→ Make sure you're in the `cfz` workspace with all changes
+→ Make sure all files are in place in the workspace
 
 ### "Cannot find module 'dotenv'"
 

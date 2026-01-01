@@ -475,9 +475,8 @@ INFO: Created TensorFlow Lite XNNPACK delegate for CPU.
 2026-01-01 11:40:23,969 [ERROR] Database error: could not receive data from server: Network is down
 
 2026-01-01 11:40:29,308 [INFO] Connected to database
-2026-01-01 11:57:04,261 [ERROR] Database error: could not receive data from server: Network is down
-
-2026-01-01 11:57:09,608 [INFO] Connected to database
+2026-01-01 11:57:04,261 [ERROR] Database error: could not receive 2026-01-01 20:37:18,294 [INFO] Shutdown signal received, finishing current job...
+abase
 2026-01-01 12:23:38,506 [ERROR] Database error: could not receive data from server: Network is down
 
 2026-01-01 12:23:43,829 [INFO] Connected to database
@@ -500,7 +499,8 @@ INFO: Created TensorFlow Lite XNNPACK delegate for CPU.
 2026-01-01 14:32:52,903 [INFO] Processing job cf33334c-a6e8-4a8d-bfb1-92d432dbf234 (type: deep_research)
 2026-01-01 14:36:00,087 [INFO] Processing job 48f28f28-88eb-4d69-bd60-1d6c0422c05c (type: deep_research)
 2026-01-01 14:42:22,666 [INFO] Processing job 4a034c31-0ef5-4eae-8318-e6f5b2cf0f44 (type: deep_research)
- 14:03:48,283 [ERROR] Database error: could not receive data from server: Operation timed out
+2026-01-01 20:37:18,294 [INFO] Shutdown signal received, finishing current job...
+n timed out
 
 2026-01-01 14:03:53,602 [INFO] Connected to database
 2026-01-01 14:14:02,925 [INFO] Processing job 92f37174-390f-44a4-bc5f-e77a24848510 (type: deep_research)
@@ -544,47 +544,26 @@ Traceback (most recent call last):
     raise child_exception_type(errno_num, err_msg, err_filename)
 FileNotFoundError: [Errno 2] No such file or directory: 'ffprobe'
 2026-01-01 18:01:41,302 [ERROR] Job 66d848eb-79fa-4a16-84d8-a9d0bafadd9f failed: [Errno 2] No such file or directory: 'ffprobe'
-nected to database
-2026-01-01 08:52:42,115 [ERROR] Database error: could not receive data from server: Network is down
-
-2026-01-01 08:52:47,419 [INFO] Connected to database
-2026-01-01 09:02:19,158 [ERROR] Database error: could not receive data from server: Network is down
-
-2026-01-01 09:02:24,505 [INFO] Connected to database
-2026-01-01 09:18:41,356 [ERROR] Database error: could not receive data from server: Operation timed out
-
-2026-01-01 09:18:46,679 [INFO] Connected to database
-2026-01-01 09:34:56,376 [ERROR] Database error: could not receive data from server: Network is down
-
-2026-01-01 09:35:01,676 [INFO] Connected to database
-2026-01-01 09:51:28,276 [ERROR] Database error: could not receive data from server: Network is down
-
-2026-01-01 09:51:33,590 [INFO] Connected to database
-2026-01-01 10:03:22,451 [ERROR] Database error: could not receive data from server: Network is down
-
-2026-01-01 10:03:27,773 [INFO] Connected to database
-2026-01-01 10:19:32,428 [ERROR] Database error: could not receive data from server: Network is down
-
-2026-01-01 10:19:37,730 [INFO] Connected to database
-2026-01-01 10:37:09,464 [ERROR] Database error: could not receive data from server: Operation timed out
-
-2026-01-01 10:37:14,801 [INFO] Connected to database
-2026-01-01 10:53:03,480 [ERROR] Database error: could not receive data from server: Operation timed out
-
-2026-01-01 10:53:08,810 [INFO] Connected to database
-2026-01-01 11:04:33,055 [ERROR] Database error: could not receive data from server: Operation timed out
-
-2026-01-01 11:04:38,376 [INFO] Connected to database
-2026-01-01 11:23:22,080 [ERROR] Database error: could not receive data from server: Operation timed out
-
-2026-01-01 11:23:27,393 [INFO] Connected to database
-2026-01-01 11:40:23,969 [ERROR] Database error: could not receive data from server: Network is down
-
-2026-01-01 11:40:29,305 [INFO] Connected to database
-2026-01-01 11:57:06,263 [ERROR] Database error: could not receive data from server: Network is down
-
-2026-01-01 11:57:11,614 [INFO] Connected to database
-2026-01-01 12:23:33,204 [ERROR] Database error: could not receive data from server: Operation timed out
+2026-01-01 20:32:37,646 [INFO] Processing job eaeeb753-b3ad-4435-9231-445c6824875d (type: video_process)
+2026-01-01 20:32:37,836 [INFO] HTTP Request: GET https://supabasekong-og0w4c0soc048kkc0gkcs8ow.vizr.cc/rest/v1/project_assets?select=%2A&id=eq.38e0f998-6dad-4ce6-9201-70680dba3a8e "HTTP/2 200 OK"
+2026-01-01 20:32:37,838 [INFO] Downloading video from project-raw-videos/54c452c9-040a-46eb-b95e-90356201f355/039e453d-76a7-4a30-b9bd-10f737d6064c/1767295941140.mp4
+2026-01-01 20:32:38,280 [INFO] HTTP Request: GET https://supabasekong-og0w4c0soc048kkc0gkcs8ow.vizr.cc/storage/v1/object/project-raw-videos/54c452c9-040a-46eb-b95e-90356201f355/039e453d-76a7-4a30-b9bd-10f737d6064c/1767295941140.mp4 "HTTP/2 200 OK"
+2026-01-01 20:33:07,741 [ERROR] Video processing failed
+Traceback (most recent call last):
+  File "/Users/hc/Documents/GitHub/Vibe---Youtube-Workflow/workers/media/handlers/video_process.py", line 53, in process
+    input_path = os.path.join(self.temp_dir, f"{job_id}_input.mp4")
+  File "/Users/hc/Documents/GitHub/Vibe---Youtube-Workflow/workers/media/handlers/video_process.py", line 166, in _get_duration
+    logger.warning(f"Intro transition failed: {intro_result.get('error')}")
+  File "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/subprocess.py", line 505, in run
+    with Popen(*popenargs, **kwargs) as process:
+  File "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/subprocess.py", line 951, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+  File "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/subprocess.py", line 1821, in _execute_child
+    raise child_exception_type(errno_num, err_msg, err_filename)
+FileNotFoundError: [Errno 2] No such file or directory: 'ffprobe'
+2026-01-01 20:33:07,927 [ERROR] Job eaeeb753-b3ad-4435-9231-445c6824875d failed: [Errno 2] No such file or directory: 'ffprobe'
+2026-01-01 20:37:18,294 [INFO] Shutdown signal received, finishing current job...
+om server: Operation timed out
 
 2026-01-01 12:23:38,494 [INFO] Connected to database
 2026-01-01 12:45:03,971 [ERROR] Database error: could not receive data from server: Network is down
@@ -599,3 +578,4 @@ nected to database
 2026-01-01 14:02:08,199 [ERROR] Database error: could not receive data from server: Operation timed out
 
 2026-01-01 14:02:13,519 [INFO] Connected to database
+2026-01-01 20:37:18,294 [INFO] Shutdown signal received, finishing current job...

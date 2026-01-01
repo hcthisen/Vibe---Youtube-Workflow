@@ -36,3 +36,4 @@ CREATE INDEX IF NOT EXISTS idx_jobs_user_search_type_status
     WHERE status IN ('search_queued', 'search_running');
 
 
+

@@ -191,12 +191,13 @@ def apply_cuts_to_video(
     
     # Build keep segments (inverse of cuts)
     # Start with full duration
-    cmd = [
-        "ffprobe", "-v", "error", "-show_entries", "format=duration",
-        "-of", "default=noprint_wrappers=1:nokey=1", input_path
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-    duration = float(result.stdout.strip())
+    try:
+        from utils.vad_processor import get_duration
+
+        duration = get_duration(input_path)
+    except Exception as e:
+        logger.error(f"Failed to determine video duration: {e}")
+        return {"success": False, "error": str(e)}
     
     # Sort cuts by start time
     sorted_cuts = sorted(cut_instructions, key=lambda x: x["start_time"])

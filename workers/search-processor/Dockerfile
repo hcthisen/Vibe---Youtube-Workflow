@@ -2,20 +2,19 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy workspace root package files
-COPY package*.json ./
-COPY apps/web/package*.json ./apps/web/
+# Install dependencies for the worker itself (do not rely on other workspace packages)
+COPY workers/search-processor/package*.json ./workers/search-processor/
+WORKDIR /app/workers/search-processor
+RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
-# Install dependencies
-RUN npm install
-
-# Copy worker files
+# Copy worker source
 COPY workers/search-processor ./workers/search-processor/
 
-# Copy necessary source files for tool execution
+# Copy the tool registry + handlers the worker imports at runtime
 COPY apps/web/src/lib ./apps/web/src/lib/
 
-WORKDIR /app/workers/search-processor
+ENV NODE_ENV=production
 
 CMD ["npm", "start"]
+
 
