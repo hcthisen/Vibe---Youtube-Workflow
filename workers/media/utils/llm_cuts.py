@@ -244,6 +244,7 @@ def analyze_retake_cuts(
     
     logger.info(f"Analyzing {len(retake_matches)} retake markers with LLM ({model})...")
     logger.info(f"  Context window: {context_window_seconds}s, Min confidence: {min_confidence}")
+    logger.info(f"  Processing ALL retake markers in a single LLM call for optimal analysis")
     
     client = OpenAI(api_key=api_key)
     
@@ -253,11 +254,86 @@ def analyze_retake_cuts(
         sentence_boundaries = identify_sentence_boundaries(transcript_words)
         logger.info(f"  Identified {len(sentence_boundaries)} sentence boundaries")
     
-    all_cuts = []
+    # Build full transcript with timestamps for LLM
+    full_transcript_text = "\n".join([
+        f"[{w['start']:.2f}s - {w['end']:.2f}s] {w['word']}"
+        for w in transcript_words
+    ])
     
-    # Process each retake marker separately for better context
-    for idx, match in enumerate(retake_matches):
-        logger.info(f"  Processing retake marker {idx + 1}/{len(retake_matches)} at {match['start']:.2f}s")
+    # List all retake marker locations
+    retake_locations = "\n".join([
+        f"- Retake phrase '{m['phrase']}' found at {m['start']:.2f}s - {m['end']:.2f}s"
+        for m in retake_matches
+    ])
+    
+    # Detect patterns for all markers (for context)
+    patterns = []
+    for match in retake_matches:
+        context_words, _, _ = extract_context_window(
+            transcript_words,
+            match["start"],
+            context_window_seconds
+        )
+        pattern = detect_retake_pattern(context_words, match, transcript_words)
+        patterns.append(pattern)
+        logger.info(f"  Marker at {match['start']:.2f}s: pattern={pattern}")
+    
+    # Build comprehensive prompt for ALL retake markers at once
+    prompt = f"""You are analyzing a video transcript with MULTIPLE retake markers. The speaker recorded a video and made several mistakes, saying retake phrases to signal they want to redo those parts.
+
+**Your Task:**
+Analyze ALL {len(retake_matches)} retake markers together and determine what should be cut out for each one. Some markers may be related (multiple attempts at the same thing), so consider the overall context.
+
+**Full Transcript with Timestamps:**
+{full_transcript_text}
+
+**All Retake Markers Found ({len(retake_matches)} total):**
+{retake_locations}
+
+**Pattern Analysis:**
+{chr(10).join([f"- Marker at {retake_matches[i]['start']:.2f}s: {patterns[i]}" for i in range(len(retake_matches))])}
+
+**Guidelines:**
+1. For EACH retake marker, identify what content before it should be removed
+2. Consider if multiple markers are related (e.g., 3 retakes at same spot = 2 failed attempts + 1 success)
+3. Use sentence boundaries for natural cuts when possible
+4. Be flexible with cut length (2 seconds to 30+ seconds based on context)
+5. Include the retake phrase itself in cuts (remove it)
+6. The content AFTER the final successful retake should be KEPT
+
+**Think step-by-step for EACH marker:**
+- What was the speaker trying to say?
+- Where does the mistake actually begin?
+- Is this marker related to nearby markers?
+- What are the natural cut boundaries?
+
+**Output Format:**
+Return a JSON object analyzing ALL markers:
+{{
+  "cuts": [
+    {{
+      "start_time": <float>,
+      "end_time": <float>,
+      "reason": "<description>",
+      "related_markers": [<list of marker timestamps this cut relates to>]
+    }},
+    ...
+  ],
+  "reasoning": "<explain your overall strategy for handling all {len(retake_matches)} markers>",
+  "confidence": <float 0-1, overall confidence>
+}}
+
+Include cuts for:
+1. Mistake segments before each retake phrase
+2. The retake phrases themselves
+3. If multiple retakes are at same spot, remove all failed attempts, keep final success
+"""
+    
+    try:
+        # Call LLM ONCE with ALL retake markers
+        all_cuts = _call_llm_with_retry_single(
+            client, model, prompt, retake_matches, patterns, max_retries=DEFAULT_MAX_RETRIES
+        )
         
         # Extract context window
         context_words, start_idx, end_idx = extract_context_window(
@@ -270,104 +346,29 @@ def analyze_retake_cuts(
             logger.warning(f"  No context words found for marker at {match['start']:.2f}s")
             continue
         
-        # Detect retake pattern
-        pattern = detect_retake_pattern(context_words, match, transcript_words)
-        logger.info(f"  Detected pattern: {pattern}")
+        # Filter by confidence if needed
+        if min_confidence > 0:
+            original_count = len(all_cuts)
+            all_cuts = [
+                cut for cut in all_cuts 
+                if cut.get("confidence", 1.0) >= min_confidence
+            ]
+            if len(all_cuts) < original_count:
+                logger.warning(
+                    f"  Filtered {original_count - len(all_cuts)} cuts below "
+                    f"confidence threshold {min_confidence}"
+                )
         
-        # Build contextual transcript for LLM
-        context_text = "\n".join([
-            f"[{w['start']:.2f}s - {w['end']:.2f}s] {w['word']}"
-            for w in context_words
-        ])
-        
-        # Build enhanced prompt with reasoning steps
-        prompt = f"""You are an expert video editing assistant analyzing a retake marker in a video transcript.
-
-**Context:**
-A speaker said the retake phrase "{match['phrase']}" at {match['start']:.2f}s - {match['end']:.2f}s.
-This indicates they made a mistake and want to redo that part.
-
-**Pattern Type:** {pattern}
-- quick_fix: Short 2-5 second mistake, continues same thought
-- full_redo: Longer 10+ second segment, restarts completely  
-- multiple_attempts: Multiple retakes in quick succession
-- medium_segment: 5-10 second mistake
-
-**Transcript Context ({context_window_seconds}s window):**
-{context_text}
-
-**Your Task:**
-Analyze the content BEFORE the retake marker and determine what should be cut out.
-
-**Think step-by-step:**
-1. What was the speaker trying to say before "{match['phrase']}"?
-2. Where does the mistake/unwanted content actually BEGIN?
-   - Look for false starts, repeated words, or topic shifts
-   - Consider sentence boundaries for natural cut points
-   - The mistake might be 2 seconds or 30+ seconds before the marker
-3. Where should the cut END? (Usually just before the retake phrase)
-4. What will remain after the cut? Will the flow be natural?
-
-**Important Guidelines:**
-- Be FLEXIBLE with cut length - analyze context, don't assume fixed duration
-- Use precise timestamps from the transcript
-- The redo content AFTER "{match['phrase']}" should be KEPT
-- Include the retake phrase itself in the cuts (remove it)
-- Consider natural pauses and sentence boundaries
-- Be conservative if unsure - better to cut less than too much
-
-**Output Format:**
-Return a JSON object with your analysis:
-{{
-  "cuts": [
-    {{
-      "start_time": <float>,
-      "end_time": <float>, 
-      "reason": "<clear description of what's being removed>"
-    }}
-  ],
-  "reasoning": "<explain your decision-making process>",
-  "confidence": <float 0-1, your confidence in this analysis>
-}}
-
-Include AT LEAST two cuts:
-1. The mistake segment before the retake phrase
-2. The retake phrase itself ({match['start']:.2f}s - {match['end']:.2f}s)
-
-You may include additional cuts if the pattern shows multiple failed attempts."""
-        
-        try:
-            # Call LLM with retry logic
-            cuts_for_marker = _call_llm_with_retry(
-                client, model, prompt, match, pattern, max_retries=DEFAULT_MAX_RETRIES
-            )
-            
-            # Filter by confidence if needed
-            if min_confidence > 0:
-                original_count = len(cuts_for_marker)
-                cuts_for_marker = [
-                    cut for cut in cuts_for_marker 
-                    if cut.get("confidence", 1.0) >= min_confidence
-                ]
-                if len(cuts_for_marker) < original_count:
-                    logger.warning(
-                        f"  Filtered {original_count - len(cuts_for_marker)} cuts below "
-                        f"confidence threshold {min_confidence}"
-                    )
-            
-            all_cuts.extend(cuts_for_marker)
-            
-        except Exception as e:
-            logger.error(f"  LLM analysis failed for marker at {match['start']:.2f}s: {e}")
-            # Fallback for this specific marker
-            logger.warning(f"  Using fallback heuristic for this marker")
-            fallback_cuts = generate_fallback_cuts(
-                transcript_words, 
-                [match],
-                vad_segments=vad_segments,
-                sentence_boundaries=sentence_boundaries if prefer_sentence_boundaries else None
-            )
-            all_cuts.extend(fallback_cuts)
+    except Exception as e:
+        logger.error(f"  LLM analysis failed: {e}")
+        # Fallback for ALL markers
+        logger.warning(f"  Using fallback heuristic for all markers")
+        all_cuts = generate_fallback_cuts(
+            transcript_words, 
+            retake_matches,
+            vad_segments=vad_segments,
+            sentence_boundaries=sentence_boundaries if prefer_sentence_boundaries else None
+        )
     
     # Merge overlapping cuts
     all_cuts = merge_overlapping_cuts(all_cuts)
@@ -383,23 +384,23 @@ You may include additional cuts if the pattern shows multiple failed attempts.""
     return all_cuts
 
 
-def _call_llm_with_retry(
+def _call_llm_with_retry_single(
     client: OpenAI,
     model: str,
     prompt: str,
-    match: Dict,
-    pattern: str,
+    retake_matches: List[Dict],
+    patterns: List[str],
     max_retries: int = DEFAULT_MAX_RETRIES
 ) -> List[Dict]:
     """
-    Call LLM API with retry logic and exponential backoff.
+    Call LLM API once with ALL retake markers (more efficient than multiple calls).
     
     Args:
         client: OpenAI client instance
         model: Model name to use
         prompt: Prompt to send
-        match: Retake match info
-        pattern: Detected pattern type
+        retake_matches: All retake matches
+        patterns: Detected patterns for each match
         max_retries: Maximum number of retry attempts
     
     Returns:
@@ -417,12 +418,12 @@ def _call_llm_with_retry(
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are an expert video editing assistant that analyzes transcripts to identify optimal cut points. You provide detailed reasoning and confidence scores."
+                        "content": "You are an expert video editing assistant that analyzes transcripts with multiple retake markers to identify optimal cut points. You provide detailed reasoning and confidence scores."
                     },
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.2,  # Lower temperature for more consistent results
-                max_tokens=3000
+                max_tokens=4000  # More tokens for multiple markers
             )
             
             result_text = response.choices[0].message.content.strip()
@@ -440,9 +441,22 @@ def _call_llm_with_retry(
             reasoning = result.get("reasoning", "No reasoning provided")
             confidence = result.get("confidence", 0.8)
             
+            logger.info(f"  LLM analyzed all {len(retake_matches)} markers in single call")
+            logger.info(f"  Generated {len(cuts)} cut instructions")
+            
             # Enhance cuts with metadata
             enhanced_cuts = []
             for cut in cuts:
+                # Determine which pattern this cut relates to based on timestamps
+                related_markers = cut.get("related_markers", [])
+                pattern = "multiple_attempts"  # Default for multi-marker analysis
+                
+                # Try to match pattern based on related markers
+                for i, match in enumerate(retake_matches):
+                    if match["start"] in related_markers or abs(cut["start_time"] - match["start"]) < 5.0:
+                        pattern = patterns[i]
+                        break
+                
                 enhanced_cut = {
                     "start_time": cut["start_time"],
                     "end_time": cut["end_time"],

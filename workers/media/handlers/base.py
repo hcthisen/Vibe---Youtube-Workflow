@@ -38,20 +38,49 @@ class BaseHandler(ABC):
 
     def upload_asset(self, bucket: str, path: str, local_path: str, content_type: str = None) -> bool:
         """Upload an asset to Supabase storage."""
+        response = None
         try:
+            # Read file first to avoid file handle issues
             with open(local_path, "rb") as f:
-                options = {}
-                if content_type:
-                    options["content_type"] = content_type
-                    
-                self.supabase.storage.from_(bucket).upload(
+                file_content = f.read()
+            
+            # Prepare options
+            options = {"upsert": "true"}  # Allow overwriting
+            if content_type:
+                options["content_type"] = content_type
+            
+            # Upload to storage
+            try:
+                response = self.supabase.storage.from_(bucket).upload(
                     path,
-                    f.read(),
+                    file_content,
                     file_options=options
                 )
+                logger.info(f"  Uploaded {len(file_content)} bytes to {bucket}/{path}")
+            except Exception as upload_error:
+                # If upload fails, try removing existing file first then re-upload
+                logger.warning(f"  Upload failed, attempting to remove existing file: {upload_error}")
+                try:
+                    self.supabase.storage.from_(bucket).remove([path])
+                    logger.info(f"  Removed existing file, retrying upload...")
+                    response = self.supabase.storage.from_(bucket).upload(
+                        path,
+                        file_content,
+                        file_options=options
+                    )
+                    logger.info(f"  Retry successful: {len(file_content)} bytes uploaded")
+                except Exception as retry_error:
+                    logger.error(f"  Retry also failed: {retry_error}")
+                    raise retry_error
+            
             return True
+        except FileNotFoundError as e:
+            logger.error(f"Failed to upload to {bucket}/{path}: File not found at {local_path}")
+            return False
         except Exception as e:
-            logger.error(f"Failed to upload to {bucket}/{path}: {e}")
+            logger.error(f"Failed to upload to {bucket}/{path}: {type(e).__name__}: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return False
 
     def create_asset_record(self, user_id: str, project_id: str, asset_type: str,

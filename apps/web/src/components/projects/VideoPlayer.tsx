@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 interface Asset {
   id: string;
@@ -14,16 +15,21 @@ interface Asset {
 interface VideoPlayerProps {
   rawAsset?: Asset;
   processedAsset?: Asset;
+  projectId: string;
+  hasFailedJob?: boolean;
 }
 
-export function VideoPlayer({ rawAsset, processedAsset }: VideoPlayerProps) {
+export function VideoPlayer({ rawAsset, processedAsset, projectId, hasFailedJob }: VideoPlayerProps) {
   const supabase = createClient();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<"processed" | "raw">(
     processedAsset ? "processed" : "raw"
   );
   const [rawUrl, setRawUrl] = useState<string | null>(null);
   const [processedUrl, setProcessedUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [reprocessing, setReprocessing] = useState(false);
+  const [reprocessError, setReprocessError] = useState<string | null>(null);
 
   // Generate appropriate URL based on bucket type
   const getVideoUrl = async (asset: Asset): Promise<string | null> => {
@@ -70,8 +76,35 @@ export function VideoPlayer({ rawAsset, processedAsset }: VideoPlayerProps) {
     loadVideoUrls();
   }, [rawAsset?.id, processedAsset?.id]);
 
+  const handleReprocess = async () => {
+    setReprocessing(true);
+    setReprocessError(null);
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}/reprocess`, {
+        method: "POST",
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || "Failed to start reprocessing");
+      }
+
+      // Refresh the page to show the new job status
+      router.refresh();
+    } catch (error) {
+      setReprocessError(error instanceof Error ? error.message : "Failed to start reprocessing");
+    } finally {
+      setReprocessing(false);
+    }
+  };
+
   const currentAsset = activeTab === "processed" ? processedAsset : rawAsset;
   const currentUrl = activeTab === "processed" ? processedUrl : rawUrl;
+
+  // Show re-process button if video has been processed or failed
+  const showReprocessButton = (processedAsset || hasFailedJob) && rawAsset;
 
   if (!rawAsset && !processedAsset) {
     return (
@@ -92,6 +125,41 @@ export function VideoPlayer({ rawAsset, processedAsset }: VideoPlayerProps) {
 
   return (
     <div className="space-y-4">
+      {/* Re-process button and error message */}
+      {showReprocessButton && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleReprocess}
+              disabled={reprocessing}
+              className="px-4 py-2 bg-accent-600 hover:bg-accent-700 disabled:bg-accent-600/50 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+            >
+              {reprocessing ? (
+                <>
+                  <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                  Reprocessing...
+                </>
+              ) : (
+                <>
+                  <span>🔄</span>
+                  Re-Process Video
+                </>
+              )}
+            </button>
+            <p className="text-sm text-gray-400">
+              {hasFailedJob 
+                ? "Previous processing failed. Re-process with current settings." 
+                : "Re-process video with current settings (retake detection, intro transition, etc.)"}
+            </p>
+          </div>
+          {reprocessError && (
+            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
+              {reprocessError}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Tab selector - only show if both videos exist */}
       {rawAsset && processedAsset && (
         <div className="flex gap-2 border-b border-gray-700">

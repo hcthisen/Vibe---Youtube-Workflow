@@ -37,6 +37,9 @@ COPY --from=deps /app/package-lock.json* ./package-lock.json*
 # Copy all source code
 COPY . .
 
+# Ensure public directory exists (even if build context omits .gitkeep)
+RUN mkdir -p /app/apps/web/public
+
 # Build Next.js
 WORKDIR /app/apps/web
 

@@ -122,11 +122,21 @@ export default async function ProjectPage({
                   </p>
                 </div>
                 {rawVideo && (
-                  <VideoPlayer rawAsset={rawVideo} processedAsset={processedVideo} />
+                  <VideoPlayer 
+                    rawAsset={rawVideo} 
+                    processedAsset={processedVideo} 
+                    projectId={project.id}
+                    hasFailedJob={true}
+                  />
                 )}
               </div>
             ) : rawVideo || processedVideo ? (
-              <VideoPlayer rawAsset={rawVideo} processedAsset={processedVideo} />
+              <VideoPlayer 
+                rawAsset={rawVideo} 
+                processedAsset={processedVideo} 
+                projectId={project.id}
+                hasFailedJob={false}
+              />
             ) : (
               <VideoUploader projectId={project.id} />
             )}
