@@ -1,7 +1,7 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface Asset {
   id: string;
@@ -21,15 +21,54 @@ export function VideoPlayer({ rawAsset, processedAsset }: VideoPlayerProps) {
   const [activeTab, setActiveTab] = useState<"processed" | "raw">(
     processedAsset ? "processed" : "raw"
   );
+  const [rawUrl, setRawUrl] = useState<string | null>(null);
+  const [processedUrl, setProcessedUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Get URLs for both videos
-  const rawUrl = rawAsset
-    ? supabase.storage.from(rawAsset.bucket).getPublicUrl(rawAsset.path).data.publicUrl
-    : null;
+  // Generate appropriate URL based on bucket type
+  const getVideoUrl = async (asset: Asset): Promise<string | null> => {
+    // Check if bucket is public
+    const isPublic = asset.bucket === 'project-thumbnails';
+    
+    if (isPublic) {
+      return supabase.storage.from(asset.bucket).getPublicUrl(asset.path).data.publicUrl;
+    }
+    
+    // Generate signed URL for private buckets (valid for 1 hour)
+    const { data, error } = await supabase.storage
+      .from(asset.bucket)
+      .createSignedUrl(asset.path, 3600);
+    
+    if (error) {
+      console.error('Failed to generate signed URL:', error);
+      return null;
+    }
+    
+    return data?.signedUrl || null;
+  };
 
-  const processedUrl = processedAsset
-    ? supabase.storage.from(processedAsset.bucket).getPublicUrl(processedAsset.path).data.publicUrl
-    : null;
+  // Get signed URLs for private buckets
+  useEffect(() => {
+    async function loadVideoUrls() {
+      setLoading(true);
+      
+      // Load raw video URL
+      if (rawAsset) {
+        const url = await getVideoUrl(rawAsset);
+        setRawUrl(url);
+      }
+      
+      // Load processed video URL
+      if (processedAsset) {
+        const url = await getVideoUrl(processedAsset);
+        setProcessedUrl(url);
+      }
+      
+      setLoading(false);
+    }
+    
+    loadVideoUrls();
+  }, [rawAsset?.id, processedAsset?.id]);
 
   const currentAsset = activeTab === "processed" ? processedAsset : rawAsset;
   const currentUrl = activeTab === "processed" ? processedUrl : rawUrl;
@@ -38,6 +77,15 @@ export function VideoPlayer({ rawAsset, processedAsset }: VideoPlayerProps) {
     return (
       <div className="text-center py-8 text-gray-400">
         No video available
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="text-center py-8">
+        <div className="animate-spin w-6 h-6 border-2 border-primary-500 border-t-transparent rounded-full mx-auto" />
+        <p className="text-gray-400 mt-2">Loading video...</p>
       </div>
     );
   }

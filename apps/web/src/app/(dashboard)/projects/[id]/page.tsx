@@ -61,7 +61,8 @@ export default async function ProjectPage({
   // Categorize assets
   const rawVideo = assets.find((a) => a.type === "raw_video");
   const processedVideo = assets.find((a) => a.type === "processed_video");
-  const transcript = assets.find((a) => a.type === "transcript");
+  // Find JSON transcript (not plain text)
+  const transcript = assets.find((a) => a.type === "transcript" && a.path.endsWith(".json"));
   const editReport = assets.find((a) => a.type === "edit_report");
   const thumbnails = assets.filter((a) => a.type === "thumbnail");
 
@@ -166,8 +167,11 @@ function EditReportView({ metadata }: { metadata: Record<string, unknown> }) {
   const report = metadata as {
     original_duration_ms?: number;
     processed_duration_ms?: number;
+    final_duration_ms?: number;
     total_silence_removed_ms?: number;
+    silence_removed_ms?: number;
     cuts_count?: number;
+    retake_cuts?: any[];
   };
 
   const formatDuration = (ms: number) => {
@@ -177,6 +181,11 @@ function EditReportView({ metadata }: { metadata: Record<string, unknown> }) {
     return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
   };
 
+  // Handle both field name formats
+  const processedDuration = report.processed_duration_ms ?? report.final_duration_ms;
+  const silenceRemoved = report.total_silence_removed_ms ?? report.silence_removed_ms;
+  const cutsCount = report.cuts_count ?? (report.retake_cuts?.length ?? 0);
+
   return (
     <div className="space-y-3 text-sm">
       {report.original_duration_ms && (
@@ -185,22 +194,22 @@ function EditReportView({ metadata }: { metadata: Record<string, unknown> }) {
           <span className="text-white">{formatDuration(report.original_duration_ms)}</span>
         </div>
       )}
-      {report.processed_duration_ms && (
+      {processedDuration && (
         <div className="flex justify-between">
           <span className="text-gray-400">Processed</span>
-          <span className="text-white">{formatDuration(report.processed_duration_ms)}</span>
+          <span className="text-white">{formatDuration(processedDuration)}</span>
         </div>
       )}
-      {report.total_silence_removed_ms && (
+      {silenceRemoved && (
         <div className="flex justify-between">
           <span className="text-gray-400">Silence Removed</span>
-          <span className="text-accent-400">{formatDuration(report.total_silence_removed_ms)}</span>
+          <span className="text-accent-400">{formatDuration(silenceRemoved)}</span>
         </div>
       )}
-      {report.cuts_count && (
+      {cutsCount > 0 && (
         <div className="flex justify-between">
           <span className="text-gray-400">Total Cuts</span>
-          <span className="text-white">{report.cuts_count}</span>
+          <span className="text-white">{cutsCount}</span>
         </div>
       )}
     </div>

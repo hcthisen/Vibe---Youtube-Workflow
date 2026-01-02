@@ -22,6 +22,12 @@ interface Transcript {
   language: string;
 }
 
+interface WordLevelTranscript {
+  word: string;
+  start: number;
+  end: number;
+}
+
 interface TranscriptViewerProps {
   asset: Asset;
 }
@@ -37,13 +43,59 @@ export function TranscriptViewer({ asset }: TranscriptViewerProps) {
     loadTranscript();
   }, [asset.id]);
 
+  const convertWordLevelToSegments = (words: WordLevelTranscript[]): Transcript => {
+    const segments: TranscriptSegment[] = [];
+    let currentSegment: TranscriptSegment | null = null;
+    const segmentGap = 1.0; // 1 second gap creates new segment
+    
+    for (const word of words) {
+      const startMs = Math.floor(word.start * 1000);
+      const endMs = Math.floor(word.end * 1000);
+      
+      if (!currentSegment || (word.start - currentSegment.end_ms / 1000) > segmentGap) {
+        // Start new segment
+        if (currentSegment) segments.push(currentSegment);
+        currentSegment = {
+          start_ms: startMs,
+          end_ms: endMs,
+          text: word.word
+        };
+      } else {
+        // Append to current segment
+        currentSegment.text += " " + word.word;
+        currentSegment.end_ms = endMs;
+      }
+    }
+    
+    if (currentSegment) segments.push(currentSegment);
+    
+    return {
+      segments,
+      full_text: words.map(w => w.word).join(" "),
+      language: "en"
+    };
+  };
+
   const loadTranscript = async () => {
     try {
       const { data } = await supabase.storage.from(asset.bucket).download(asset.path);
 
       if (data) {
         const text = await data.text();
-        setTranscript(JSON.parse(text));
+        const parsed = JSON.parse(text);
+        
+        // Check if it's word-level format (array of {word, start, end})
+        if (Array.isArray(parsed) && parsed.length > 0 && 'word' in parsed[0]) {
+          // Convert word-level format to segment format
+          const converted = convertWordLevelToSegments(parsed);
+          setTranscript(converted);
+        } else if (parsed.segments && parsed.full_text) {
+          // Already in segment format
+          setTranscript(parsed);
+        } else {
+          console.error("Unknown transcript format:", parsed);
+          setTranscript(null);
+        }
       }
     } catch (error) {
       console.error("Failed to load transcript:", error);
