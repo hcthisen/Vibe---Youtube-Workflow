@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 
 const navigation = [
   {
@@ -33,10 +34,11 @@ const navigation = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <aside className="w-64 bg-gray-800/50 border-r border-gray-700 flex flex-col">
-      <div className="p-6">
+    <aside className="w-full md:w-64 bg-gray-800/50 border-b md:border-b-0 md:border-r border-gray-700 flex flex-col">
+      <div className="p-4 md:p-6 flex items-center justify-between gap-4">
         <Link href="/dashboard" className="flex items-center gap-3">
           <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
             <svg
@@ -61,32 +63,43 @@ export function Sidebar() {
           </div>
           <span className="text-lg font-semibold text-white">YT Assistant</span>
         </Link>
+        <button
+          type="button"
+          onClick={() => setIsOpen((prev) => !prev)}
+          className="md:hidden inline-flex items-center justify-center rounded-md border border-gray-700 px-3 py-2 text-sm font-medium text-gray-200 hover:bg-gray-700/50"
+          aria-expanded={isOpen}
+          aria-label="Toggle menu"
+        >
+          {isOpen ? "Close" : "Menu"}
+        </button>
       </div>
 
-      <nav className="flex-1 px-3 space-y-1">
-        {navigation.map((item) => {
-          const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
-          return (
-            <Link
-              key={item.name}
-              href={item.href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                isActive
-                  ? "bg-primary-600/20 text-primary-400"
-                  : "text-gray-400 hover:bg-gray-700/50 hover:text-white"
-              }`}
-            >
-              <item.icon className="w-5 h-5" />
-              {item.name}
-            </Link>
-          );
-        })}
-      </nav>
+      <div className={`${isOpen ? "block" : "hidden"} md:flex md:flex-1 md:flex-col`}>
+        <nav className="flex-1 px-3 space-y-1 pb-4 md:pb-0">
+          {navigation.map((item) => {
+            const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+            return (
+              <Link
+                key={item.name}
+                href={item.href}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  isActive
+                    ? "bg-primary-600/20 text-primary-400"
+                    : "text-gray-400 hover:bg-gray-700/50 hover:text-white"
+                }`}
+              >
+                <item.icon className="w-5 h-5" />
+                {item.name}
+              </Link>
+            );
+          })}
+        </nav>
 
-      <div className="p-4 border-t border-gray-700">
-        <p className="text-xs text-gray-500 text-center">
-          YouTube Production Assistant v0.1
-        </p>
+        <div className="p-4 border-t border-gray-700">
+          <p className="text-xs text-gray-500 text-center">
+            YouTube Production Assistant v0.1
+          </p>
+        </div>
       </div>
     </aside>
   );
@@ -162,4 +175,3 @@ function BugIcon({ className }: { className?: string }) {
     </svg>
   );
 }
-
