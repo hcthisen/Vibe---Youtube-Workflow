@@ -93,7 +93,13 @@ export function IdeaBrief({ projectId, markdown }: IdeaBriefProps) {
         />
       ) : (
         <div className="prose prose-invert prose-gray max-w-none">
-          <MarkdownViewer content={content} />
+          {content.trim() ? (
+            <MarkdownViewer content={content} />
+          ) : (
+            <div className="text-gray-500 italic py-8 text-center">
+              No brief content yet. Click "Edit" to add your idea brief.
+            </div>
+          )}
         </div>
       )}
     </div>

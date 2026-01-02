@@ -73,6 +73,37 @@ OPENAI_API_KEY=sk-...
 
 # Optional: Worker configuration
 WORKER_CHECK_INTERVAL=5  # seconds between job checks
+
+# Optional: Upload configuration (for large files)
+UPLOAD_TIMEOUT_SECONDS=600  # 10 minutes (default)
+UPLOAD_CHUNK_SIZE_MB=50     # 50MB chunks (default)
+UPLOAD_MAX_RETRIES=3        # Max retry attempts (default)
+```
+
+### Large File Support
+
+The worker supports video uploads up to **2GB** with automatic handling:
+
+**Smart Upload Strategy**:
+- Files < 100MB: Direct upload (fast path)
+- Files >= 100MB: Chunked streaming upload (memory-efficient)
+
+**Features**:
+- Automatic retry with exponential backoff (1s, 2s, 4s delays)
+- 10-minute upload timeout for large files
+- Progress logging for monitoring
+- Memory-efficient streaming (doesn't load entire file into RAM)
+
+**Configuration**:
+```bash
+# Increase timeout for slower connections
+UPLOAD_TIMEOUT_SECONDS=1200  # 20 minutes
+
+# Adjust chunk size (not recommended to change)
+UPLOAD_CHUNK_SIZE_MB=50
+
+# Increase retries for unreliable networks
+UPLOAD_MAX_RETRIES=5
 ```
 
 ### Running the Worker

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { Database } from "@/lib/database.types";
 
 type ProjectAssetRow = Database["public"]["Tables"]["project_assets"]["Row"];
+type JobRow = Database["public"]["Tables"]["jobs"]["Row"];
 
 export async function POST(
   request: NextRequest,
@@ -101,7 +102,9 @@ export async function POST(
       .select()
       .single();
 
-    if (jobError || !jobData) {
+    const job = jobData as unknown as JobRow | null;
+
+    if (jobError || !job) {
       return NextResponse.json(
         { error: jobError?.message || "Failed to create reprocessing job" },
         { status: 500 }
@@ -110,7 +113,7 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
-      job_id: jobData.id,
+      job_id: job.id,
       message: "Reprocessing job created successfully",
     });
   } catch (error) {

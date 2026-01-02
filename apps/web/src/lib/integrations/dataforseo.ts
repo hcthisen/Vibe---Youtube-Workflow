@@ -454,6 +454,18 @@ class DataForSEOClient {
   }
 }
 
-// Singleton instance
-export const dataForSeoClient = new DataForSEOClient();
+let _dataForSeoClient: DataForSEOClient | null = null;
+
+/**
+ * Lazily create the DataForSEO client.
+ *
+ * This avoids throwing during `next build` / module import when env vars are not
+ * present at build-time (common on platforms like Coolify).
+ */
+export function getDataForSeoClient(): DataForSEOClient {
+  if (!_dataForSeoClient) {
+    _dataForSeoClient = new DataForSEOClient();
+  }
+  return _dataForSeoClient;
+}
 

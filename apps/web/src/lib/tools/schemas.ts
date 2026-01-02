@@ -207,25 +207,28 @@ export const headshotPoseAnalyzeOutputSchema = z.object({
 export const thumbnailGenerateFromReferenceInputSchema = z.object({
   project_id: z.string().uuid(),
   reference_thumbnail_url: z.string().url(),
-  headshot_ids: z.array(z.string().uuid()).optional(),
+  headshot_id: z.string().uuid().optional(), // Optional manual override
+  preset_style_id: z.string().uuid().optional(), // Optional preset style to use as reference
+  text_modifications: z.string().optional(), // Optional text changes
   prompt_additions: z.string().optional(),
-  count: z.number().optional().default(3),
+  idea_brief_markdown: z.string().optional(), // Optional idea brief for context
+  count: z.number().min(1).max(4).optional().default(2), // 1-4 thumbnails, default 2
 });
 
 export const thumbnailGenerateFromReferenceOutputSchema = z.object({
-  thumbnails: z.array(
-    z.object({
-      asset_id: z.string().uuid(),
-      url: z.string(),
-    })
-  ),
+  job_id: z.string().uuid(),
+  status: z.string(),
+  headshot_used: z.string().uuid(), // Which headshot was used
 });
 
 export const thumbnailIterateInputSchema = z.object({
   project_id: z.string().uuid(),
   previous_thumbnail_asset_id: z.string().uuid(),
+  headshot_id: z.string().uuid().optional(), // Optional: swap to different headshot
+  text_modifications: z.string().optional(), // Optional text changes
   refinement_prompt: z.string(),
-  count: z.number().optional().default(3),
+  idea_brief_markdown: z.string().optional(), // Optional idea brief for context
+  count: z.number().min(1).max(4).optional().default(2), // 1-4 thumbnails, default 2
 });
 
 export const thumbnailIterateOutputSchema = z.object({

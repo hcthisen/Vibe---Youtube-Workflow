@@ -754,11 +754,37 @@ type ProjectUpdate = Database["public"]["Tables"]["projects"]["Update"];
 | Bucket Name | Public? | Purpose | Max Size |
 |-------------|---------|---------|----------|
 | `user-headshots` | ❌ Private | User profile headshot images | 50 MB |
-| `project-raw-videos` | ❌ Private | Original uploaded videos | 500 MB |
-| `project-processed-videos` | ❌ Private | Edited videos (silence removed) | 500 MB |
+| `project-raw-videos` | ❌ Private | Original uploaded videos | **2 GB** |
+| `project-processed-videos` | ❌ Private | Edited videos (silence removed) | **2 GB** |
 | `project-transcripts` | ❌ Private | Video transcripts (text/JSON) | 50 MB |
 | `project-reports` | ❌ Private | Edit reports and metadata | 50 MB |
 | `project-thumbnails` | ✅ Public | Generated thumbnail images | 50 MB |
+
+### Large File Upload Handling
+
+The system supports video uploads up to **2GB** with intelligent handling:
+
+**Upload Strategy**:
+- **Small files (< 100MB)**: Direct upload using Supabase client (fast path)
+- **Large files (>= 100MB)**: Chunked streaming upload via REST API (memory-efficient)
+
+**Features**:
+- **Memory-efficient**: Streams files in chunks, doesn't load entire file into RAM
+- **Automatic retry**: Exponential backoff (1s, 2s, 4s delays) for network failures
+- **Timeout handling**: 10-minute default timeout for large uploads
+- **Progress logging**: Monitors upload progress for debugging
+
+**Implementation**:
+- **Frontend**: `apps/web/src/components/projects/VideoUploader.tsx` validates file size before upload
+- **Worker**: `workers/media/utils/storage.py` handles chunked uploads
+- **Configuration**: `workers/media/config.py` defines timeout and retry settings
+
+**Environment Variables** (optional):
+```bash
+UPLOAD_TIMEOUT_SECONDS=600    # Default: 10 minutes
+UPLOAD_CHUNK_SIZE_MB=50       # Default: 50MB chunks
+UPLOAD_MAX_RETRIES=3          # Default: 3 attempts
+```
 
 ### Creating Buckets
 

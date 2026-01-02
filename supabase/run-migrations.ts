@@ -8,9 +8,26 @@
 
 import { readFileSync, readdirSync, existsSync } from "fs";
 import { join } from "path";
+import { config } from "dotenv";
 import pg from "pg";
 
 const { Client } = pg;
+
+// Load environment variables from .env.local
+const envPaths = [
+  join(process.cwd(), ".env.local"),
+  join(process.cwd(), "apps", "web", ".env.local"),
+  join(process.cwd(), "..", "..", ".env.local"),
+  join(process.cwd(), "..", "..", "apps", "web", ".env.local"),
+];
+
+for (const envPath of envPaths) {
+  if (existsSync(envPath)) {
+    console.log(`Loading environment from: ${envPath}`);
+    config({ path: envPath });
+    break;
+  }
+}
 
 async function runMigrations() {
   const databaseUrl = process.env.DATABASE_URL;

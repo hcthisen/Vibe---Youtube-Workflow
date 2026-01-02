@@ -411,6 +411,18 @@ Respond with ONLY this exact JSON structure:
   }
 }
 
-// Singleton instance
-export const openaiClient = new OpenAIClient();
+let _openaiClient: OpenAIClient | null = null;
+
+/**
+ * Lazily create the OpenAI client.
+ *
+ * This avoids throwing during `next build` / module import when env vars are not
+ * present at build-time (common on platforms like Coolify).
+ */
+export function getOpenAIClient(): OpenAIClient {
+  if (!_openaiClient) {
+    _openaiClient = new OpenAIClient();
+  }
+  return _openaiClient;
+}
 

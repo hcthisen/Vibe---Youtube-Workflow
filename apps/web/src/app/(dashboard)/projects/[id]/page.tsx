@@ -78,12 +78,10 @@ export default async function ProjectPage({
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
           {/* Idea Brief Section */}
-          {project.idea_brief_markdown && (
-            <IdeaBrief
-              projectId={project.id}
-              markdown={project.idea_brief_markdown}
-            />
-          )}
+          <IdeaBrief
+            projectId={project.id}
+            markdown={project.idea_brief_markdown || ""}
+          />
 
           {/* Outline Section */}
           <section className="bg-gray-800/30 border border-gray-700 rounded-xl p-6">
@@ -156,7 +154,9 @@ export default async function ProjectPage({
           <section className="bg-gray-800/30 border border-gray-700 rounded-xl p-6">
             <ThumbnailGallery
               projectId={project.id}
+              userId={user.id}
               thumbnails={thumbnails}
+              ideaBriefMarkdown={project.idea_brief_markdown || undefined}
             />
           </section>
 

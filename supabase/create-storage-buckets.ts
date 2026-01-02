@@ -7,9 +7,27 @@
  */
 
 import { createClient } from "@supabase/supabase-js";
+import { config } from "dotenv";
+import { existsSync } from "fs";
+import { join } from "path";
+
+// Load environment variables from .env.local
+const envPaths = [
+  join(process.cwd(), ".env.local"),
+  join(process.cwd(), "apps", "web", ".env.local"),
+];
+
+for (const envPath of envPaths) {
+  if (existsSync(envPath)) {
+    console.log(`Loading environment from: ${envPath}`);
+    config({ path: envPath });
+    break;
+  }
+}
 
 const BUCKETS = [
   { name: "user-headshots", public: false },
+  { name: "thumbnail-preset-styles", public: false }, // User preset thumbnail styles
   { name: "project-raw-videos", public: false },
   { name: "project-processed-videos", public: false },
   { name: "project-transcripts", public: false },

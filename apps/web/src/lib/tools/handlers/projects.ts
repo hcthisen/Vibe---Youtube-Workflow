@@ -7,7 +7,7 @@ import type {
   ProjectGenerateTitlesInput,
   ProjectGenerateTitlesOutput,
 } from "../schemas";
-import { openaiClient } from "@/lib/integrations/openai";
+import { getOpenAIClient } from "@/lib/integrations/openai";
 import { createServiceClient } from "@/lib/supabase/service";
 import type { Database } from "@/lib/database.types";
 
@@ -170,7 +170,7 @@ export async function projectGenerateOutlineHandler(
 
     const idea = project.ideas as { ai_summary?: string; title_variants?: string[] } | null;
 
-    const result = await openaiClient.generateOutline({
+    const result = await getOpenAIClient().generateOutline({
       title: project.title,
       context: input.context || idea?.ai_summary || "",
       existingHooks: idea?.title_variants || [],
@@ -235,7 +235,7 @@ export async function projectGenerateTitlesHandler(
 
     const idea = project.ideas as { ai_summary?: string } | null;
 
-    const result = await openaiClient.generateTitles({
+    const result = await getOpenAIClient().generateTitles({
       currentTitle: project.title,
       context: idea?.ai_summary || "",
       count: input.count || 10,

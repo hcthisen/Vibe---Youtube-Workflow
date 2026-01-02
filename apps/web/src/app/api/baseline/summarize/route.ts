@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
-import { openaiClient } from "@/lib/integrations/openai";
-import { dataForSeoClient } from "@/lib/integrations/dataforseo";
+import { getOpenAIClient } from "@/lib/integrations/openai";
+import { getDataForSeoClient } from "@/lib/integrations/dataforseo";
 
 interface VideoTranscript {
   video_id: string;
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
       
       const transcriptPromises = videosToAnalyze.map(async (video: { video_id: string; title: string }) => {
         try {
-          const result = await dataForSeoClient.getVideoSubtitles(video.video_id);
+          const result = await getDataForSeoClient().getVideoSubtitles(video.video_id);
           return {
             video_id: video.video_id,
             title: video.title,
@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
 
     console.log(`Generating baseline summary with ${processedVideos.length} video transcripts...`);
 
-    const result = await openaiClient.generateBaselineSummary({ videos: processedVideos });
+    const result = await getOpenAIClient().generateBaselineSummary({ videos: processedVideos });
 
     if (!result.success) {
       console.error("OpenAI baseline summary error:", result.error);

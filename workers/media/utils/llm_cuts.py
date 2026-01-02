@@ -335,17 +335,6 @@ Include cuts for:
             client, model, prompt, retake_matches, patterns, max_retries=DEFAULT_MAX_RETRIES
         )
         
-        # Extract context window
-        context_words, start_idx, end_idx = extract_context_window(
-            transcript_words,
-            match["start"],
-            context_window_seconds
-        )
-        
-        if not context_words:
-            logger.warning(f"  No context words found for marker at {match['start']:.2f}s")
-            continue
-        
         # Filter by confidence if needed
         if min_confidence > 0:
             original_count = len(all_cuts)

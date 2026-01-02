@@ -201,6 +201,10 @@ class VideoProcessHandler(BaseHandler):
                     ".mov", "_processed.mp4"
                 ).replace(".webm", "_processed.mp4")
 
+                # Log file size for context
+                file_size_mb = os.path.getsize(current_video_path) / 1024 / 1024
+                logger.info(f"  Processed video size: {file_size_mb:.2f}MB")
+
                 if not self.upload_asset(
                     "project-processed-videos",
                     output_storage_path,

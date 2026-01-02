@@ -9,8 +9,8 @@ import type {
   VideoSubtitlesFetchInput,
   VideoSubtitlesFetchOutput,
 } from "../schemas";
-import { dataForSeoClient } from "@/lib/integrations/dataforseo";
-import { openaiClient } from "@/lib/integrations/openai";
+import { getDataForSeoClient } from "@/lib/integrations/dataforseo";
+import { getOpenAIClient } from "@/lib/integrations/openai";
 import { createServiceClient } from "@/lib/supabase/service";
 
 export async function channelImportLatest20Handler(
@@ -22,7 +22,7 @@ export async function channelImportLatest20Handler(
   try {
     logs.push(`Fetching latest 20 videos for channel: ${input.channel_identifier}`);
 
-    const result = await dataForSeoClient.getChannelVideos(input.channel_identifier, 20);
+    const result = await getDataForSeoClient().getChannelVideos(input.channel_identifier, 20);
 
     if (!result.success) {
       return { success: false, error: result.error, logs };
@@ -78,7 +78,7 @@ export async function outlierSearchHandler(
   try {
     logs.push(`Searching for outliers with keywords: ${input.keywords.join(", ")}`);
 
-    const result = await dataForSeoClient.searchVideos({
+    const result = await getDataForSeoClient().searchVideos({
       keywords: input.keywords,
       limit: input.limit || 50,
       language_code: input.language_code,
@@ -271,7 +271,7 @@ export async function deepResearchHandler(
 
     logs.push(`Using baseline context: ${baselineContext.slice(0, 100)}...`);
 
-    const result = await openaiClient.generateIdeas({
+    const result = await getOpenAIClient().generateIdeas({
       baselineContext,
       baselineKeywords,
       avoidTopics: input.avoid_topics || [],
@@ -311,7 +311,7 @@ export async function videoSubtitlesFetchHandler(
   try {
     logs.push(`Fetching subtitles for video: ${input.youtube_video_id}`);
 
-    const result = await dataForSeoClient.getVideoSubtitles(input.youtube_video_id);
+    const result = await getDataForSeoClient().getVideoSubtitles(input.youtube_video_id);
 
     if (!result.success) {
       return {

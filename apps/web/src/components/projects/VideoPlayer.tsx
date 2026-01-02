@@ -30,6 +30,10 @@ export function VideoPlayer({ rawAsset, processedAsset, projectId, hasFailedJob 
   const [loading, setLoading] = useState(true);
   const [reprocessing, setReprocessing] = useState(false);
   const [reprocessError, setReprocessError] = useState<string | null>(null);
+  
+  // Lazy loading state
+  const [shouldLoadVideo, setShouldLoadVideo] = useState(false);
+  const [previewGenerated, setPreviewGenerated] = useState(false);
 
   // Generate appropriate URL based on bucket type
   const getVideoUrl = async (asset: Asset): Promise<string | null> => {
@@ -53,8 +57,13 @@ export function VideoPlayer({ rawAsset, processedAsset, projectId, hasFailedJob 
     return data?.signedUrl || null;
   };
 
-  // Get signed URLs for private buckets
+  // Get signed URLs for private buckets (only when user wants to play)
   useEffect(() => {
+    if (!shouldLoadVideo) {
+      setLoading(false);
+      return;
+    }
+
     async function loadVideoUrls() {
       setLoading(true);
       
@@ -74,7 +83,7 @@ export function VideoPlayer({ rawAsset, processedAsset, projectId, hasFailedJob 
     }
     
     loadVideoUrls();
-  }, [rawAsset?.id, processedAsset?.id]);
+  }, [shouldLoadVideo, rawAsset?.id, processedAsset?.id]);
 
   const handleReprocess = async () => {
     setReprocessing(true);
@@ -186,12 +195,50 @@ export function VideoPlayer({ rawAsset, processedAsset, projectId, hasFailedJob 
         </div>
       )}
 
-      {/* Video player */}
-      {currentUrl && (
+      {/* Video player or preview */}
+      {!shouldLoadVideo ? (
+        // Show preview with play button
+        <div className="relative aspect-video bg-gray-900 rounded-lg overflow-hidden group cursor-pointer" onClick={() => setShouldLoadVideo(true)}>
+          {/* Dark overlay */}
+          <div className="absolute inset-0 bg-black/40 flex items-center justify-center group-hover:bg-black/50 transition-colors">
+            {/* Play button */}
+            <div className="relative">
+              <div className="w-20 h-20 rounded-full bg-primary-500/90 group-hover:bg-primary-600 flex items-center justify-center transition-colors">
+                <svg
+                  className="w-10 h-10 text-white ml-1"
+                  fill="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              </div>
+              <div className="absolute inset-0 rounded-full bg-primary-500/20 animate-ping" />
+            </div>
+          </div>
+
+          {/* Video info overlay */}
+          <div className="absolute bottom-4 left-4 right-4 text-white">
+            <p className="text-sm font-medium">
+              {activeTab === "processed" ? "Processed Video" : "Original Video"}
+            </p>
+            {currentAsset &&
+            typeof currentAsset.metadata === "object" &&
+            currentAsset.metadata !== null &&
+            (currentAsset.metadata as any).original_duration_ms ? (
+              <p className="text-xs text-gray-300 mt-1">
+                Duration: {Math.floor((currentAsset.metadata as any).original_duration_ms / 1000)}s
+              </p>
+            ) : null}
+            <p className="text-xs text-gray-400 mt-2">Click to load video</p>
+          </div>
+        </div>
+      ) : currentUrl ? (
+        // Show actual video player
         <>
           <video
             key={currentUrl}
             controls
+            autoPlay
             className="w-full rounded-lg bg-black"
             src={currentUrl}
           >
@@ -225,7 +272,7 @@ export function VideoPlayer({ rawAsset, processedAsset, projectId, hasFailedJob 
             ) : null}
           </div>
         </>
-      )}
+      ) : null}
     </div>
   );
 }

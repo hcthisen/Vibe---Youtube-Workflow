@@ -29,9 +29,9 @@ export function VideoUploader({ projectId }: VideoUploaderProps) {
         return;
       }
 
-      // Validate file size (500MB max)
-      if (file.size > 500 * 1024 * 1024) {
-        setError("File size must be under 500MB");
+      // Validate file size (2GB max)
+      if (file.size > 2 * 1024 * 1024 * 1024) {
+        setError(`File size must be under 2GB. Your file is ${(file.size / 1024 / 1024 / 1024).toFixed(2)}GB`);
         return;
       }
 
@@ -172,7 +172,7 @@ export function VideoUploader({ projectId }: VideoUploaderProps) {
           <p className="text-gray-300 font-medium">
             {uploading ? `Uploading... ${progress}%` : "Upload raw video"}
           </p>
-          <p className="text-sm text-gray-500 mt-1">MP4, MOV, or WebM up to 500MB</p>
+          <p className="text-sm text-gray-500 mt-1">MP4, MOV, or WebM up to 2GB</p>
         </label>
       </div>
 

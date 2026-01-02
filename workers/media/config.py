@@ -26,6 +26,11 @@ class Config:
     # Whisper
     WHISPER_MODEL = os.getenv("WHISPER_MODEL", "base")
     
+    # Upload settings
+    UPLOAD_TIMEOUT_SECONDS = int(os.getenv("UPLOAD_TIMEOUT_SECONDS", "600"))  # 10 min
+    UPLOAD_CHUNK_SIZE_MB = int(os.getenv("UPLOAD_CHUNK_SIZE_MB", "50"))  # 50MB chunks
+    UPLOAD_MAX_RETRIES = int(os.getenv("UPLOAD_MAX_RETRIES", "3"))
+    
     @classmethod
     def validate(cls):
         """Validate that all required config is present."""

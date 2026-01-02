@@ -3,6 +3,7 @@ import type { Database } from "@/lib/database.types";
 import { redirect } from "next/navigation";
 import { ProfileForm } from "@/components/settings/ProfileForm";
 import { HeadshotManager } from "@/components/settings/HeadshotManager";
+import { ThumbnailPresetManager } from "@/components/settings/ThumbnailPresetManager";
 import { ChannelBaseline } from "@/components/settings/ChannelBaseline";
 
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
@@ -50,8 +51,12 @@ export default async function SettingsPage({
   const tabs = [
     { id: "profile", label: "Profile Settings" },
     { id: "headshots", label: "Headshots" },
+    { id: "thumbnail-presets", label: "Thumbnail Presets" },
     { id: "channel", label: "Channel Baseline" },
   ];
+
+  // Extract preset styles from profile
+  const presetStyles = (profile?.thumbnail_preset_styles as any) || [];
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
@@ -93,6 +98,12 @@ export default async function SettingsPage({
           <HeadshotManager
             headshots={headshots}
             userId={user.id}
+          />
+        )}
+        {activeTab === "thumbnail-presets" && (
+          <ThumbnailPresetManager
+            userId={user.id}
+            presetStyles={presetStyles}
           />
         )}
         {activeTab === "channel" && (
