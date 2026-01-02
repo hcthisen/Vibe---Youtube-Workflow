@@ -4,8 +4,9 @@ Storage utilities for handling large file uploads to Supabase.
 import os
 import time
 import logging
-from typing import Optional
+from typing import Optional, Dict
 import requests
+import base64
 
 
 def get_file_size(file_path: str) -> int:
@@ -77,19 +78,17 @@ def upload_small_file(
         True if upload successful, False otherwise
     """
     try:
-        # Read file content
-        with open(local_path, "rb") as f:
-            file_content = f.read()
-        
-        # Prepare options
-        options = {"upsert": "true"}
+        # NOTE: storage3 expects HTTP headers as file_options.
+        # - content type key must be "content-type"
+        # - upsert must be a STRING ("true"/"false"), not a bool (bool causes .encode errors in httpx)
+        options: Dict[str, str] = {"upsert": "true"}
         if content_type:
-            options["content_type"] = content_type
+            options["content-type"] = content_type
         
         def do_upload():
             response = supabase.storage.from_(bucket).upload(
                 path,
-                file_content,
+                local_path,  # let storage3 stream from disk
                 file_options=options
             )
             return response
@@ -103,7 +102,7 @@ def upload_small_file(
         )
         
         if logger:
-            logger.info(f"  Uploaded {len(file_content)} bytes to {bucket}/{path}")
+            logger.info(f"  Uploaded {os.path.getsize(local_path)} bytes to {bucket}/{path}")
         
         return True
         
@@ -118,16 +117,13 @@ def upload_small_file(
                 logger.info(f"  Removed existing file, retrying upload...")
             
             def do_retry():
-                with open(local_path, "rb") as f:
-                    file_content = f.read()
-                
                 options = {"upsert": "true"}
                 if content_type:
-                    options["content_type"] = content_type
+                    options["content-type"] = content_type
                 
                 response = supabase.storage.from_(bucket).upload(
                     path,
-                    file_content,
+                    local_path,
                     file_options=options
                 )
                 return response
@@ -150,98 +146,127 @@ def upload_small_file(
             return False
 
 
-def upload_large_file(
-    supabase,
+def _b64(s: str) -> str:
+    return base64.b64encode(s.encode("utf-8")).decode("ascii")
+
+
+def _tus_metadata(bucket: str, path: str, content_type: Optional[str]) -> str:
+    # Supabase expects these keys (same as tus-js-client usage in the frontend):
+    # bucketName, objectName, contentType, cacheControl
+    md = {
+        "bucketName": _b64(bucket),
+        "objectName": _b64(path),
+        "contentType": _b64(content_type or "application/octet-stream"),
+        "cacheControl": _b64("3600"),
+    }
+    return ",".join([f"{k} {v}" for k, v in md.items()])
+
+
+def upload_resumable_tus(
     bucket: str,
     path: str,
     local_path: str,
     content_type: Optional[str] = None,
-    logger: Optional[logging.Logger] = None
+    logger: Optional[logging.Logger] = None,
+    upsert: str = "true",
 ) -> bool:
     """
-    Upload large file (>=100MB) using chunked streaming approach.
-    
-    This method streams the file in chunks to avoid loading the entire file into memory.
-    Uses Supabase Storage REST API directly with proper timeout configuration.
-    
-    Args:
-        supabase: Supabase client instance
-        bucket: Storage bucket name
-        path: Remote path within bucket
-        local_path: Local file path
-        content_type: MIME type (optional)
-        logger: Logger instance
-    
-    Returns:
-        True if upload successful, False otherwise
+    Upload via Supabase Storage resumable endpoint (TUS).
+
+    This avoids gateway body-size limits on /storage/v1/object (fixes 413s around ~50-150MB).
     """
     from config import Config
-    
-    try:
-        file_size = get_file_size(local_path)
-        file_size_mb = file_size / 1024 / 1024
-        
-        if logger:
-            logger.info(f"  Large file upload: {file_size_mb:.2f}MB")
-            logger.info(f"  Using chunked upload with {Config.UPLOAD_TIMEOUT_SECONDS}s timeout")
-        
-        # Get Supabase credentials
-        supabase_url = os.getenv("NEXT_PUBLIC_SUPABASE_URL")
-        service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-        
-        if not supabase_url or not service_key:
-            raise ValueError("Missing Supabase URL or service key")
-        
-        # Remove existing file first (upsert for large files can be problematic)
-        try:
-            supabase.storage.from_(bucket).remove([path])
-            if logger:
-                logger.info(f"  Removed existing file (if any)")
-        except Exception:
-            pass  # File might not exist, which is fine
-        
-        # Prepare upload URL and headers
-        upload_url = f"{supabase_url}/storage/v1/object/{bucket}/{path}"
-        headers = {
-            "Authorization": f"Bearer {service_key}",
-            "apikey": service_key,
-        }
-        if content_type:
-            headers["Content-Type"] = content_type
-        
-        # Define upload function with streaming
-        def do_upload():
-            with open(local_path, "rb") as f:
-                # Use requests for better control over streaming and timeouts
-                response = requests.post(
+
+    supabase_url = os.getenv("NEXT_PUBLIC_SUPABASE_URL") or os.getenv("SUPABASE_URL")
+    service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    if not supabase_url or not service_key:
+        raise ValueError("Missing NEXT_PUBLIC_SUPABASE_URL/SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY")
+
+    file_size = get_file_size(local_path)
+    chunk_size = int(Config.UPLOAD_CHUNK_SIZE_MB) * 1024 * 1024
+    endpoint = f"{supabase_url}/storage/v1/upload/resumable"
+
+    headers_base = {
+        "authorization": f"Bearer {service_key}",
+        "apikey": service_key,
+        "x-upsert": upsert,  # must be string
+        "Tus-Resumable": "1.0.0",
+    }
+
+    # 1) Create upload
+    create_headers = {
+        **headers_base,
+        "Upload-Length": str(file_size),
+        "Upload-Metadata": _tus_metadata(bucket=bucket, path=path, content_type=content_type),
+    }
+
+    if logger:
+        logger.info(f"  TUS upload create: {bucket}/{path} ({file_size / 1024 / 1024:.2f}MB)")
+        logger.info(f"  Chunk size: {chunk_size / 1024 / 1024:.2f}MB, timeout: {Config.UPLOAD_TIMEOUT_SECONDS}s")
+
+    create_resp = requests.post(endpoint, headers=create_headers, timeout=Config.UPLOAD_TIMEOUT_SECONDS)
+    if create_resp.status_code not in (200, 201, 204):
+        raise Exception(f"TUS create failed {create_resp.status_code}: {create_resp.text}")
+
+    upload_url = create_resp.headers.get("Location")
+    if not upload_url:
+        raise Exception(f"TUS create missing Location header (status {create_resp.status_code})")
+    if upload_url.startswith("/"):
+        upload_url = f"{supabase_url}{upload_url}"
+
+    # 2) Upload chunks
+    offset = 0
+    with open(local_path, "rb") as f:
+        while offset < file_size:
+            f.seek(offset)
+            chunk = f.read(min(chunk_size, file_size - offset))
+
+            def do_patch():
+                patch_headers = {
+                    **headers_base,
+                    "Upload-Offset": str(offset),
+                    "Content-Type": "application/offset+octet-stream",
+                }
+                resp = requests.patch(
                     upload_url,
-                    headers=headers,
-                    data=f,
-                    timeout=Config.UPLOAD_TIMEOUT_SECONDS
+                    headers=patch_headers,
+                    data=chunk,
+                    timeout=Config.UPLOAD_TIMEOUT_SECONDS,
                 )
-                
-                if response.status_code not in (200, 201):
-                    error_detail = response.json() if response.headers.get('content-type', '').startswith('application/json') else response.text
-                    raise Exception(f"Upload failed with status {response.status_code}: {error_detail}")
-                
-                return True
-        
-        # Upload with retry and exponential backoff
-        result = upload_with_retry(
-            do_upload,
-            max_retries=Config.UPLOAD_MAX_RETRIES,
-            logger=logger
-        )
-        
-        if logger:
-            logger.info(f"  Successfully uploaded {file_size_mb:.2f}MB to {bucket}/{path}")
-        
-        return result
-        
-    except Exception as e:
-        if logger:
-            logger.error(f"  Large file upload failed: {type(e).__name__}: {e}")
-        return False
+                if resp.status_code != 204:
+                    raise Exception(f"TUS patch failed {resp.status_code}: {resp.text}")
+                new_offset = resp.headers.get("Upload-Offset")
+                if new_offset is None:
+                    raise Exception("TUS patch missing Upload-Offset header")
+                return int(new_offset)
+
+            try:
+                new_offset = upload_with_retry(
+                    do_patch,
+                    max_retries=Config.UPLOAD_MAX_RETRIES,
+                    logger=logger,
+                )
+            except Exception as e:
+                # Try to recover by HEAD to learn server offset
+                head_headers = {**headers_base}
+                head_resp = requests.head(upload_url, headers=head_headers, timeout=Config.UPLOAD_TIMEOUT_SECONDS)
+                server_offset = head_resp.headers.get("Upload-Offset")
+                if server_offset is not None:
+                    offset = int(server_offset)
+                    if logger:
+                        logger.warning(f"  Recovered offset from server: {offset}")
+                    continue
+                raise e
+
+            offset = new_offset
+            if logger:
+                pct = (offset / file_size) * 100
+                if int(pct) % 10 == 0 or offset == file_size:
+                    logger.info(f"  TUS progress: {pct:.0f}% ({offset}/{file_size})")
+
+    if logger:
+        logger.info(f"  TUS upload complete: {bucket}/{path}")
+    return True
 
 
 def upload_file_smart(
@@ -279,32 +304,35 @@ def upload_file_smart(
         # Get file size
         file_size = get_file_size(local_path)
         file_size_mb = file_size / 1024 / 1024
-        
-        # Choose upload method based on size
-        LARGE_FILE_THRESHOLD_MB = 100
-        
-        if file_size_mb < LARGE_FILE_THRESHOLD_MB:
+
+        # Choose upload method:
+        # - Use TUS resumable upload for videos and/or larger files to avoid 413 gateway limits.
+        is_video_bucket = bucket in ("project-raw-videos", "project-processed-videos")
+        is_video_type = bool(content_type and content_type.startswith("video/"))
+        use_tus = is_video_bucket or is_video_type or file_size_mb >= 50
+
+        if use_tus:
             if logger:
-                logger.info(f"  File size: {file_size_mb:.2f}MB (using direct upload)")
-            return upload_small_file(
-                supabase=supabase,
+                logger.info(f"  File size: {file_size_mb:.2f}MB (using TUS resumable upload)")
+            return upload_resumable_tus(
                 bucket=bucket,
                 path=path,
                 local_path=local_path,
                 content_type=content_type,
-                logger=logger
+                logger=logger,
+                upsert="true",
             )
-        else:
-            if logger:
-                logger.info(f"  File size: {file_size_mb:.2f}MB (using chunked upload)")
-            return upload_large_file(
-                supabase=supabase,
-                bucket=bucket,
-                path=path,
-                local_path=local_path,
-                content_type=content_type,
-                logger=logger
-            )
+
+        if logger:
+            logger.info(f"  File size: {file_size_mb:.2f}MB (using direct upload)")
+        return upload_small_file(
+            supabase=supabase,
+            bucket=bucket,
+            path=path,
+            local_path=local_path,
+            content_type=content_type,
+            logger=logger
+        )
     
     except FileNotFoundError:
         if logger:

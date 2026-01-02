@@ -28,7 +28,9 @@ class Config:
     
     # Upload settings
     UPLOAD_TIMEOUT_SECONDS = int(os.getenv("UPLOAD_TIMEOUT_SECONDS", "600"))  # 10 min
-    UPLOAD_CHUNK_SIZE_MB = int(os.getenv("UPLOAD_CHUNK_SIZE_MB", "50"))  # 50MB chunks
+    # IMPORTANT: keep this small (Supabase storage gateway/proxies can reject large request bodies).
+    # Frontend uses 6MB chunks for resumable uploads, so mirror that here.
+    UPLOAD_CHUNK_SIZE_MB = int(os.getenv("UPLOAD_CHUNK_SIZE_MB", "6"))  # 6MB chunks
     UPLOAD_MAX_RETRIES = int(os.getenv("UPLOAD_MAX_RETRIES", "3"))
     
     @classmethod

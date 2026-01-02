@@ -7,147 +7,174 @@ import os
 import json
 import base64
 import time
+import logging
 from typing import Dict, Any, List, Optional
 import requests
 from supabase import Client
 from .base import BaseHandler
 
+logger = logging.getLogger(__name__)
+
 
 class ThumbnailGenerateHandler(BaseHandler):
     """Handler for thumbnail_generate job type"""
 
-    def process(self, job: Dict[str, Any]) -> Dict[str, Any]:
+    def process(self, job_id: str, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """Process a thumbnail generation job"""
-        job_input = job["input"]
-        
-        project_id = job_input["project_id"]
-        reference_thumbnail_url = job_input["reference_thumbnail_url"]
-        headshot_id = job_input["headshot_id"]
-        preset_style_id = job_input.get("preset_style_id")
-        text_modifications = job_input.get("text_modifications")
-        prompt_additions = job_input.get("prompt_additions")
-        idea_brief_markdown = job_input.get("idea_brief_markdown")
-        count = job_input.get("count", 2)
-        
-        self.logger.info(f"Generating {count} thumbnails for project {project_id}")
-        
-        # Step 1: Get project details
-        project = self.supabase.table("projects").select("title, user_id").eq("id", project_id).single().execute()
-        if not project.data:
-            raise ValueError(f"Project {project_id} not found")
-        
-        project_data = project.data
-        user_id = project_data["user_id"]
-        title = project_data["title"]
-        
-        # Step 2: Get user profile for display name
-        profile = self.supabase.table("profiles").select("display_name").eq("id", user_id).single().execute()
-        user_name = profile.data.get("display_name") if profile.data else None
-        
-        # Step 3: Get headshot details and download
-        headshot = self.supabase.table("headshots").select("bucket, path").eq("id", headshot_id).single().execute()
-        if not headshot.data:
-            raise ValueError(f"Headshot {headshot_id} not found")
-        
-        headshot_data = headshot.data
-        headshot_bucket = headshot_data["bucket"]
-        headshot_path = headshot_data["path"]
-        
-        # Download headshot
-        self.logger.info(f"Downloading headshot from {headshot_bucket}/{headshot_path}")
-        headshot_bytes = self.download_from_storage(headshot_bucket, headshot_path)
-        if not headshot_bytes:
-            raise ValueError(f"Failed to download headshot from storage")
-        
-        headshot_base64 = base64.b64encode(headshot_bytes).decode("utf-8")
-        
-        # Step 4: Download reference thumbnail
-        self.logger.info(f"Downloading reference thumbnail from {reference_thumbnail_url}")
-        reference_base64, reference_mime_type = self.download_image_from_url(reference_thumbnail_url)
-        if not reference_base64:
-            raise ValueError(f"Failed to download reference thumbnail from {reference_thumbnail_url}")
-        
-        # Step 5: Build prompt
-        prompt = self.build_face_swap_prompt(
-            user_name=user_name,
-            title=title,
-            text_modifications=text_modifications,
-            prompt_additions=prompt_additions,
-            idea_brief_markdown=idea_brief_markdown
-        )
-        
-        # Step 6: Generate thumbnails via Gemini API
-        self.logger.info(f"Generating thumbnails via Gemini API (count={count})")
-        generated_images = self.generate_thumbnails_via_gemini(
-            headshot_base64=headshot_base64,
-            reference_base64=reference_base64,
-            reference_mime_type=reference_mime_type,
-            prompt=prompt,
-            count=count
-        )
-        
-        if not generated_images:
-            raise ValueError("No thumbnails generated from Gemini API")
-        
-        # Step 7: Upload thumbnails to storage and create asset records
-        thumbnails = []
-        timestamp = int(time.time() * 1000)
-        
-        for i, image_base64 in enumerate(generated_images):
-            path = f"{user_id}/{project_id}/thumbnail_{timestamp}_{i}.png"
+        try:
+            project_id = input_data.get("project_id")
+            reference_thumbnail_url = input_data.get("reference_thumbnail_url")
+            headshot_id = input_data.get("headshot_id")
+            preset_style_id = input_data.get("preset_style_id")
+            text_modifications = input_data.get("text_modifications")
+            prompt_additions = input_data.get("prompt_additions")
+            idea_brief_markdown = input_data.get("idea_brief_markdown")
+            count = input_data.get("count", 2)
             
-            # Upload to storage
-            self.logger.info(f"Uploading thumbnail {i+1}/{len(generated_images)} to storage")
-            image_bytes = base64.b64decode(image_base64)
+            if not project_id:
+                return {"success": False, "error": "Missing required input: project_id"}
+            if not reference_thumbnail_url:
+                return {"success": False, "error": "Missing required input: reference_thumbnail_url"}
+            if not headshot_id:
+                return {"success": False, "error": "Missing required input: headshot_id"}
             
-            upload_result = self.supabase.storage.from_("project-thumbnails").upload(
-                path=path,
-                file=image_bytes,
-                file_options={"content-type": "image/png"}
+            logger.info(f"Generating {count} thumbnails for project {project_id}")
+        
+            # Step 1: Get project details
+            project = self.supabase.table("projects").select("title, user_id").eq("id", project_id).single().execute()
+            if not project.data:
+                return {"success": False, "error": f"Project {project_id} not found"}
+            
+            project_data = project.data
+            user_id = project_data["user_id"]
+            title = project_data["title"]
+            
+            # Step 2: Get user profile for display name
+            profile = self.supabase.table("profiles").select("display_name").eq("id", user_id).single().execute()
+            user_name = profile.data.get("display_name") if profile.data else None
+            
+            # Step 3: Get headshot details and download
+            headshot = self.supabase.table("headshots").select("bucket, path").eq("id", headshot_id).single().execute()
+            if not headshot.data:
+                return {"success": False, "error": f"Headshot {headshot_id} not found"}
+        
+            headshot_data = headshot.data
+            headshot_bucket = headshot_data["bucket"]
+            headshot_path = headshot_data["path"]
+            
+            # Download headshot
+            logger.info(f"Downloading headshot from {headshot_bucket}/{headshot_path}")
+            headshot_bytes = self.download_from_storage(headshot_bucket, headshot_path)
+            if not headshot_bytes:
+                return {"success": False, "error": "Failed to download headshot from storage"}
+            
+            headshot_base64 = base64.b64encode(headshot_bytes).decode("utf-8")
+            
+            # Step 4: Download reference thumbnail
+            logger.info(f"Downloading reference thumbnail from {reference_thumbnail_url}")
+            reference_base64, reference_mime_type = self.download_image_from_url(reference_thumbnail_url)
+            if not reference_base64:
+                return {"success": False, "error": f"Failed to download reference thumbnail from {reference_thumbnail_url}"}
+        
+            # Step 5: Build prompt
+            prompt = self.build_face_swap_prompt(
+                user_name=user_name,
+                title=title,
+                text_modifications=text_modifications,
+                prompt_additions=prompt_additions,
+                idea_brief_markdown=idea_brief_markdown
             )
             
-            if upload_result.status_code not in [200, 201]:
-                self.logger.error(f"Failed to upload thumbnail {i}: {upload_result}")
-                continue
+            # Step 6: Generate thumbnails via Gemini API
+            logger.info(f"Generating thumbnails via Gemini API (count={count})")
+            generated_images = self.generate_thumbnails_via_gemini(
+                headshot_base64=headshot_base64,
+                reference_base64=reference_base64,
+                reference_mime_type=reference_mime_type,
+                prompt=prompt,
+                count=count
+            )
             
-            # Create asset record
-            asset = self.supabase.table("project_assets").insert({
-                "user_id": user_id,
-                "project_id": project_id,
-                "type": "thumbnail",
-                "bucket": "project-thumbnails",
-                "path": path,
-                "metadata": {
-                    "reference_url": reference_thumbnail_url,
-                    "headshot_id": headshot_id,
-                    "preset_style_id": preset_style_id,
-                    "prompt_additions": prompt_additions,
-                    "text_modifications": text_modifications,
-                    "idea_brief_markdown": idea_brief_markdown,
-                    "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime())
+            if not generated_images:
+                return {"success": False, "error": "No thumbnails generated from Gemini API"}
+        
+            # Step 7: Upload thumbnails to storage and create asset records
+            thumbnails = []
+            timestamp = int(time.time() * 1000)
+            
+            for i, image_base64 in enumerate(generated_images):
+                path = f"{user_id}/{project_id}/thumbnail_{timestamp}_{i}.png"
+                
+                # Upload to storage
+                logger.info(f"Uploading thumbnail {i+1}/{len(generated_images)} to storage")
+                image_bytes = base64.b64decode(image_base64)
+                
+                upload_result = self.supabase.storage.from_("project-thumbnails").upload(
+                    path=path,
+                    file=image_bytes,
+                    file_options={"content-type": "image/png"}
+                )
+                
+                if upload_result.status_code not in [200, 201]:
+                    logger.error(f"Failed to upload thumbnail {i}: {upload_result}")
+                    continue
+                
+                # Create asset record
+                insert_res = self.supabase.table("project_assets").insert({
+                    "user_id": user_id,
+                    "project_id": project_id,
+                    "type": "thumbnail",
+                    "bucket": "project-thumbnails",
+                    "path": path,
+                    "metadata": {
+                        "reference_url": reference_thumbnail_url,
+                        "headshot_id": headshot_id,
+                        "preset_style_id": preset_style_id,
+                        "prompt_additions": prompt_additions,
+                        "text_modifications": text_modifications,
+                        "idea_brief_markdown": idea_brief_markdown,
+                        "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime())
+                    }
+                }, returning="representation").execute()
+
+                asset_id = None
+                if getattr(insert_res, "data", None):
+                    if isinstance(insert_res.data, list) and len(insert_res.data) > 0:
+                        asset_id = insert_res.data[0].get("id")
+                    elif isinstance(insert_res.data, dict):
+                        asset_id = insert_res.data.get("id")
+
+                if asset_id:
+                    # Get public URL
+                    public_url = self.supabase.storage.from_("project-thumbnails").get_public_url(path)
+                    thumbnails.append({
+                        "asset_id": asset_id,
+                        "url": public_url
+                    })
+                else:
+                    logger.error(f"Failed to create asset record for thumbnail {i} (no id returned)")
+            
+            logger.info(f"Successfully generated {len(thumbnails)} thumbnails")
+            
+            # Update project status to thumbnail (if not already at a later stage)
+            current_project = self.supabase.table("projects").select("status").eq("id", project_id).single().execute()
+            if current_project.data and current_project.data["status"] != "done":
+                self.supabase.table("projects").update({"status": "thumbnail"}).eq("id", project_id).execute()
+            
+            return {
+                "success": True,
+                "output": {
+                    "thumbnails": thumbnails,
+                    "headshot_used": headshot_id,
+                    "count_generated": len(thumbnails)
                 }
-            }).select("id").single().execute()
-            
-            if asset.data:
-                # Get public URL
-                public_url = self.supabase.storage.from_("project-thumbnails").get_public_url(path)
-                thumbnails.append({
-                    "asset_id": asset.data["id"],
-                    "url": public_url
-                })
-        
-        self.logger.info(f"Successfully generated {len(thumbnails)} thumbnails")
-        
-        # Update project status to thumbnail (if not already at a later stage)
-        current_project = self.supabase.table("projects").select("status").eq("id", project_id).single().execute()
-        if current_project.data and current_project.data["status"] != "done":
-            self.supabase.table("projects").update({"status": "thumbnail"}).eq("id", project_id).execute()
-        
-        return {
-            "thumbnails": thumbnails,
-            "headshot_used": headshot_id,
-            "count_generated": len(thumbnails)
-        }
+            }
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"Thumbnail generation failed: {error_msg}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            return {"success": False, "error": error_msg}
     
     def download_from_storage(self, bucket: str, path: str) -> Optional[bytes]:
         """Download a file from Supabase storage"""
@@ -155,7 +182,7 @@ class ThumbnailGenerateHandler(BaseHandler):
             result = self.supabase.storage.from_(bucket).download(path)
             return result
         except Exception as e:
-            self.logger.error(f"Failed to download from storage: {e}")
+            logger.error(f"Failed to download from storage: {e}")
             return None
     
     def download_image_from_url(self, url: str) -> tuple[Optional[str], Optional[str]]:
@@ -169,7 +196,7 @@ class ThumbnailGenerateHandler(BaseHandler):
                 video_id = self.extract_youtube_video_id(url)
                 if video_id:
                     url = f"https://i.ytimg.com/vi/{video_id}/maxresdefault.jpg"
-                    self.logger.info(f"Converted YouTube video URL to thumbnail: {url}")
+                    logger.info(f"Converted YouTube video URL to thumbnail: {url}")
             
             # Download image
             headers = {
@@ -180,7 +207,7 @@ class ThumbnailGenerateHandler(BaseHandler):
             if response.status_code != 200:
                 # Try fallback quality for YouTube
                 if "maxresdefault.jpg" in url:
-                    self.logger.info("Trying fallback thumbnail quality...")
+                    logger.info("Trying fallback thumbnail quality...")
                     fallback_url = url.replace("maxresdefault.jpg", "hqdefault.jpg")
                     return self.download_image_from_url(fallback_url)
                 return None, None
@@ -199,11 +226,11 @@ class ThumbnailGenerateHandler(BaseHandler):
             # Convert to base64
             image_base64 = base64.b64encode(response.content).decode("utf-8")
             
-            self.logger.info(f"Downloaded image: {len(response.content)} bytes, MIME: {mime_type}")
+            logger.info(f"Downloaded image: {len(response.content)} bytes, MIME: {mime_type}")
             
             return image_base64, mime_type
         except Exception as e:
-            self.logger.error(f"Failed to download image from {url}: {e}")
+            logger.error(f"Failed to download image from {url}: {e}")
             return None, None
     
     def extract_youtube_video_id(self, url: str) -> Optional[str]:
@@ -311,7 +338,7 @@ When adding or modifying text on the thumbnail, ensure it aligns with the core c
         generated_images = []
         
         for i in range(count):
-            self.logger.info(f"Generating thumbnail {i+1}/{count}...")
+            logger.info(f"Generating thumbnail {i+1}/{count}...")
             
             try:
                 response = requests.post(
@@ -322,7 +349,7 @@ When adding or modifying text on the thumbnail, ensure it aligns with the core c
                 )
                 
                 if response.status_code != 200:
-                    self.logger.error(f"Gemini API error: {response.status_code} {response.text}")
+                    logger.error(f"Gemini API error: {response.status_code} {response.text}")
                     continue
                 
                 data = response.json()
@@ -332,10 +359,10 @@ When adding or modifying text on the thumbnail, ensure it aligns with the core c
                     for part in data["candidates"][0]["content"]["parts"]:
                         if part.get("inlineData", {}).get("data"):
                             generated_images.append(part["inlineData"]["data"])
-                            self.logger.info(f"Generated thumbnail {i+1}")
+                            logger.info(f"Generated thumbnail {i+1}")
                 
             except Exception as e:
-                self.logger.error(f"Failed to generate thumbnail {i+1}: {e}")
+                logger.error(f"Failed to generate thumbnail {i+1}: {e}")
         
         return generated_images
 

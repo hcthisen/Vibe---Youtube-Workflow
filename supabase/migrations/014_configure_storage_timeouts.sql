@@ -2,10 +2,11 @@
 -- This migration ensures video buckets are properly configured for 2GB uploads
 
 -- Update bucket configuration for video storage
+-- Set allowed_mime_types to NULL to allow all types (Supabase validates by file extension)
 UPDATE storage.buckets 
 SET 
     file_size_limit = 2147483648,  -- 2GB in bytes
-    allowed_mime_types = ARRAY['video/mp4', 'video/quicktime', 'video/webm', 'video/x-matroska', 'video/avi']
+    allowed_mime_types = NULL  -- Allow all MIME types
 WHERE id IN ('project-raw-videos', 'project-processed-videos');
 
 -- Verify the configuration

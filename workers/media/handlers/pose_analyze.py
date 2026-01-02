@@ -67,7 +67,20 @@ class PoseAnalyzeHandler(BaseHandler):
                 else:
                     # Download from URL
                     import httpx
-                    response = httpx.get(image_url)
+                    response = httpx.get(image_url, follow_redirects=True, timeout=30.0)
+
+                    if response.status_code >= 400:
+                        return {
+                            "success": False,
+                            "error": f"Failed to download image_url (HTTP {response.status_code})",
+                        }
+
+                    content_type = response.headers.get("content-type", "")
+                    if content_type and not content_type.startswith("image/"):
+                        return {
+                            "success": False,
+                            "error": f"image_url did not return an image (content-type: {content_type})",
+                        }
                     with open(input_path, "wb") as f:
                         f.write(response.content)
 

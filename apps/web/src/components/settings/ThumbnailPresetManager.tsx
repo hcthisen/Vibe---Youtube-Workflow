@@ -88,7 +88,7 @@ export function ThumbnailPresetManager({
         .from("profiles")
         .update({
           thumbnail_preset_styles: updatedPresets,
-        })
+        } as any)
         .eq("id", userId);
 
       if (updateError) {
@@ -137,7 +137,7 @@ export function ThumbnailPresetManager({
         .from("profiles")
         .update({
           thumbnail_preset_styles: updatedPresets,
-        })
+        } as any)
         .eq("id", userId);
 
       if (updateError) {

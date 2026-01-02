@@ -27,3 +27,4 @@ build/
 # Temp files
 *.tmp
 .tmp/
+.cursor/debug.log

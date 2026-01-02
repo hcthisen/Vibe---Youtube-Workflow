@@ -2,11 +2,17 @@ FROM python:3.10-slim
 
 # Install system dependencies required for video processing
 RUN apt-get update && apt-get install -y \
+    build-essential \
     ffmpeg \
     libsm6 \
     libxext6 \
     libxrender-dev \
     libgomp1 \
+    libsndfile1 \
+    libglib2.0-0 \
+    libgl1 \
+    python3-dev \
+    pkg-config \
     wget \
     && rm -rf /var/lib/apt/lists/*
 

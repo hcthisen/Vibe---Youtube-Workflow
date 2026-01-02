@@ -206,12 +206,14 @@ export const headshotPoseAnalyzeOutputSchema = z.object({
 
 export const thumbnailGenerateFromReferenceInputSchema = z.object({
   project_id: z.string().uuid(),
-  reference_thumbnail_url: z.string().url(),
+  reference_thumbnail_url: z.string().trim().url({
+    message: "Please enter a valid URL (e.g., https://youtube.com/watch?v=... or https://example.com/image.jpg)"
+  }),
   headshot_id: z.string().uuid().optional(), // Optional manual override
   preset_style_id: z.string().uuid().optional(), // Optional preset style to use as reference
-  text_modifications: z.string().optional(), // Optional text changes
-  prompt_additions: z.string().optional(),
-  idea_brief_markdown: z.string().optional(), // Optional idea brief for context
+  text_modifications: z.string().trim().optional(), // Optional text changes
+  prompt_additions: z.string().trim().optional(),
+  idea_brief_markdown: z.string().trim().optional(), // Optional idea brief for context
   count: z.number().min(1).max(4).optional().default(2), // 1-4 thumbnails, default 2
 });
 

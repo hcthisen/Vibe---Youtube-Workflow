@@ -155,9 +155,9 @@ export function ThumbnailGallery({ projectId, userId, thumbnails, ideaBriefMarkd
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           project_id: projectId,
-          reference_thumbnail_url: referenceUrl,
+          reference_thumbnail_url: referenceUrl.trim(),
           headshot_id: selectedHeadshotId,
-          text_modifications: textModifications || undefined,
+          text_modifications: textModifications?.trim() || undefined,
           idea_brief_markdown: ideaBriefMarkdown,
           count: thumbnailCount,
         }),

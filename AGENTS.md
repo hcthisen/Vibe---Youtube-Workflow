@@ -782,7 +782,7 @@ The system supports video uploads up to **2GB** with intelligent handling:
 **Environment Variables** (optional):
 ```bash
 UPLOAD_TIMEOUT_SECONDS=600    # Default: 10 minutes
-UPLOAD_CHUNK_SIZE_MB=50       # Default: 50MB chunks
+UPLOAD_CHUNK_SIZE_MB=6        # Default: 6MB chunks
 UPLOAD_MAX_RETRIES=3          # Default: 3 attempts
 ```
 

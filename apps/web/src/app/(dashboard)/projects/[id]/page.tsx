@@ -13,6 +13,21 @@ type ProjectRow = Database["public"]["Tables"]["projects"]["Row"];
 type ProjectAssetRow = Database["public"]["Tables"]["project_assets"]["Row"];
 type JobRow = Database["public"]["Tables"]["jobs"]["Row"];
 
+type ThumbnailMetadata = {
+  headshot_id?: string;
+  headshot_pose?: {
+    yaw: number;
+    pitch: number;
+    bucket: string;
+  };
+  reference_url?: string;
+  text_modifications?: string;
+  prompt_additions?: string;
+  generated_at?: string;
+  refinement_prompt?: string;
+  previous_asset_id?: string;
+} | null;
+
 export default async function ProjectPage({
   params,
 }: {
@@ -64,11 +79,21 @@ export default async function ProjectPage({
   // Find JSON transcript (not plain text)
   const transcript = assets.find((a) => a.type === "transcript" && a.path.endsWith(".json"));
   const editReport = assets.find((a) => a.type === "edit_report");
-  const thumbnails = assets.filter((a) => a.type === "thumbnail");
+  
+  // Type thumbnails explicitly for ThumbnailGallery component
+  const thumbnails = assets
+    .filter((a) => a.type === "thumbnail")
+    .map((asset) => ({
+      ...asset,
+      metadata: (asset.metadata as ThumbnailMetadata),
+    }));
 
-  // Check for running jobs
-  const runningJob = jobs.find((j) => j.status === "running" || j.status === "queued");
-  const failedJob = jobs.find((j) => j.status === "failed");
+  // Check for running/failed VIDEO jobs only (avoid thumbnail/search jobs affecting video UI)
+  const videoJobTypes = new Set(["video_process", "transcribe"]);
+  const runningJob = jobs.find(
+    (j) => videoJobTypes.has(j.type) && (j.status === "running" || j.status === "queued")
+  );
+  const failedJob = jobs.find((j) => videoJobTypes.has(j.type) && j.status === "failed");
 
   return (
     <div className="space-y-8">

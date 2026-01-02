@@ -76,7 +76,7 @@ WORKER_CHECK_INTERVAL=5  # seconds between job checks
 
 # Optional: Upload configuration (for large files)
 UPLOAD_TIMEOUT_SECONDS=600  # 10 minutes (default)
-UPLOAD_CHUNK_SIZE_MB=50     # 50MB chunks (default)
+UPLOAD_CHUNK_SIZE_MB=6      # 6MB chunks (default, matches frontend TUS uploads)
 UPLOAD_MAX_RETRIES=3        # Max retry attempts (default)
 ```
 
@@ -100,7 +100,7 @@ The worker supports video uploads up to **2GB** with automatic handling:
 UPLOAD_TIMEOUT_SECONDS=1200  # 20 minutes
 
 # Adjust chunk size (not recommended to change)
-UPLOAD_CHUNK_SIZE_MB=50
+UPLOAD_CHUNK_SIZE_MB=6
 
 # Increase retries for unreliable networks
 UPLOAD_MAX_RETRIES=5

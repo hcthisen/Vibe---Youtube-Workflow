@@ -247,7 +247,7 @@ export async function thumbnailGenerateFromReferenceHandler(
     if (!selectedHeadshotId) {
       // Auto-select: analyze reference thumbnail pose and find best match
       logs.push("Analyzing reference thumbnail face pose...");
-      const referencePose = await analyzePoseFromUrl(input.reference_thumbnail_url);
+      const referencePose = await analyzePoseFromUrl(input.reference_thumbnail_url, context.userId);
 
       if (referencePose) {
         logs.push(`Reference pose: yaw=${referencePose.yaw.toFixed(1)}°, pitch=${referencePose.pitch.toFixed(1)}°, bucket=${referencePose.bucket}`);

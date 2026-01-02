@@ -55,8 +55,14 @@ export default async function SettingsPage({
     { id: "channel", label: "Channel Baseline" },
   ];
 
-  // Extract preset styles from profile
-  const presetStyles = (profile?.thumbnail_preset_styles as any) || [];
+  // Extract preset styles from profile (type relaxed for flexible schema)
+  const presetStyles = ((profile as any)?.thumbnail_preset_styles || []) as Array<{
+    id: string;
+    bucket: string;
+    path: string;
+    name: string;
+    created_at: string;
+  }>;
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">

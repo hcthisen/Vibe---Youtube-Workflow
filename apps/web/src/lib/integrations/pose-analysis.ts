@@ -12,6 +12,29 @@ export interface PoseResult {
   bucket: string;
 }
 
+function extractYouTubeVideoId(url: string): string | null {
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
+    /youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match && match[1]) return match[1];
+  }
+
+  return null;
+}
+
+function normalizeImageUrl(url: string): string {
+  const trimmed = url.trim();
+  const videoId = extractYouTubeVideoId(trimmed);
+  if (!videoId) return trimmed;
+
+  // Prefer hqdefault for reliability (maxresdefault can 404 for some videos)
+  return `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+}
+
 /**
  * Analyze face pose in an image URL
  * 
@@ -21,19 +44,28 @@ export interface PoseResult {
  */
 export async function analyzePoseFromUrl(
   imageUrl: string,
+  userId?: string,
   timeoutMs: number = 20000
 ): Promise<PoseResult | null> {
   try {
+    if (!userId) {
+      // We need a real user_id to satisfy the jobs.user_id foreign key.
+      // Callers that don't have a user context should skip pose analysis.
+      console.warn("analyzePoseFromUrl: missing userId; skipping pose analysis job creation");
+      return null;
+    }
+
     const supabase = await createServiceClient();
+    const normalizedUrl = normalizeImageUrl(imageUrl);
 
     // Create pose analysis job
     const { data: job, error: jobError } = await supabase
       .from("jobs")
       .insert({
-        user_id: "00000000-0000-0000-0000-000000000000", // System job
+        user_id: userId,
         type: "pose_analyze",
         status: "queued",
-        input: { image_url: imageUrl },
+        input: { image_url: normalizedUrl },
       })
       .select("id")
       .single();
