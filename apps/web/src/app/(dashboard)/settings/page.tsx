@@ -9,6 +9,9 @@ import { ChannelBaseline } from "@/components/settings/ChannelBaseline";
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
 type HeadshotRow = Database["public"]["Tables"]["headshots"]["Row"];
 type ChannelRow = Database["public"]["Tables"]["channels"]["Row"];
+type ProfileRowWithPresets = ProfileRow & {
+  thumbnail_preset_styles?: unknown;
+};
 
 export default async function SettingsPage({
   searchParams,
@@ -29,7 +32,7 @@ export default async function SettingsPage({
     .select("*")
     .eq("id", user.id)
     .single();
-  const profile = profileData as unknown as ProfileRow | null;
+  const profile = profileData as unknown as ProfileRowWithPresets | null;
 
   const { data: headshotsData } = await supabase
     .from("headshots")
@@ -116,4 +119,3 @@ export default async function SettingsPage({
     </div>
   );
 }
-

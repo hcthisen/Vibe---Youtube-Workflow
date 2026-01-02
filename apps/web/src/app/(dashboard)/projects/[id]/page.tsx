@@ -12,6 +12,20 @@ import { ThumbnailGallery } from "@/components/projects/ThumbnailGallery";
 type ProjectRow = Database["public"]["Tables"]["projects"]["Row"];
 type ProjectAssetRow = Database["public"]["Tables"]["project_assets"]["Row"];
 type JobRow = Database["public"]["Tables"]["jobs"]["Row"];
+type ThumbnailMetadata = {
+  headshot_id?: string;
+  headshot_pose?: {
+    yaw: number;
+    pitch: number;
+    bucket: string;
+  };
+  reference_url?: string;
+  text_modifications?: string;
+  prompt_additions?: string;
+};
+type ThumbnailAsset = Omit<ProjectAssetRow, "metadata"> & {
+  metadata: ThumbnailMetadata | null;
+};
 
 export default async function ProjectPage({
   params,
@@ -64,7 +78,12 @@ export default async function ProjectPage({
   // Find JSON transcript (not plain text)
   const transcript = assets.find((a) => a.type === "transcript" && a.path.endsWith(".json"));
   const editReport = assets.find((a) => a.type === "edit_report");
-  const thumbnails = assets.filter((a) => a.type === "thumbnail");
+  const thumbnails: ThumbnailAsset[] = assets
+    .filter((a) => a.type === "thumbnail")
+    .map((asset) => ({
+      ...asset,
+      metadata: asset.metadata as ThumbnailMetadata | null,
+    }));
 
   // Check for running jobs
   const runningJob = jobs.find((j) => j.status === "running" || j.status === "queued");
@@ -225,4 +244,3 @@ function EditReportView({ metadata }: { metadata: Record<string, unknown> }) {
     </div>
   );
 }
-

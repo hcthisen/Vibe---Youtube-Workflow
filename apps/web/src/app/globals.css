@@ -17,7 +17,7 @@
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
 @layer utilities {
@@ -50,4 +50,3 @@ body {
   outline: 2px solid var(--primary-500, #f24141);
   outline-offset: 2px;
 }
-
