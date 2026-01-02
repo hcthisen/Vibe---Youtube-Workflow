@@ -14,6 +14,8 @@ RUN apt-get update && apt-get install -y \
     python3-dev \
     pkg-config \
     wget \
+    nodejs \
+    npm \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -25,6 +27,10 @@ RUN pip install --no-cache-dir -r workers/media/requirements.txt
 # Copy worker code
 COPY workers/media/ ./workers/media/
 COPY supabase/ ./supabase/
+COPY ["Initial Templates - execution/video_effects", "/app/Initial Templates - execution/video_effects"]
+
+WORKDIR /app/Initial\ Templates\ -\ execution/video_effects
+RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
 # Create temp directory for video processing
 RUN mkdir -p /tmp/yt-worker && chmod 777 /tmp/yt-worker
@@ -36,4 +42,3 @@ ENV WORKER_TEMP_DIR=/tmp/yt-worker
 # Run the worker
 WORKDIR /app/workers/media
 CMD ["python", "worker.py"]
-
