@@ -92,15 +92,21 @@ export function VideoPlayer({ rawAsset, processedAsset }: VideoPlayerProps) {
               Download {activeTab === "processed" ? "processed" : "original"} video
             </a>
 
-            {currentAsset?.metadata && typeof currentAsset.metadata === "object" && (
+            {currentAsset &&
+            typeof currentAsset.metadata === "object" &&
+            currentAsset.metadata !== null ? (
               <div className="text-gray-400">
-                {(currentAsset.metadata as any).original_duration_ms && (
+                {(currentAsset.metadata as any).original_duration_ms ? (
                   <span>
-                    Duration: {Math.floor((currentAsset.metadata as any).original_duration_ms / 1000)}s
+                    Duration:{" "}
+                    {Math.floor(
+                      (currentAsset.metadata as any).original_duration_ms / 1000
+                    )}
+                    s
                   </span>
-                )}
+                ) : null}
               </div>
-            )}
+            ) : null}
           </div>
         </>
       )}

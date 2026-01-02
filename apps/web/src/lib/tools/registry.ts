@@ -24,7 +24,7 @@ export interface ToolDefinition<TInput = unknown, TOutput = unknown> {
   description: string;
   inputSchema: z.ZodType<TInput>;
   outputSchema: z.ZodType<TOutput>;
-  handler: (input: TInput, context: ToolRunContext) => Promise<ToolResult<TOutput>>;
+  handler(input: TInput, context: ToolRunContext): Promise<ToolResult<TOutput>>;
 }
 
 // Tool registry with handlers

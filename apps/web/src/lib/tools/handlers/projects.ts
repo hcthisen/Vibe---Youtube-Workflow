@@ -9,6 +9,9 @@ import type {
 } from "../schemas";
 import { openaiClient } from "@/lib/integrations/openai";
 import { createServiceClient } from "@/lib/supabase/service";
+import type { Database } from "@/lib/database.types";
+
+type ProjectRow = Database["public"]["Tables"]["projects"]["Row"];
 
 export async function projectCreateFromIdeaHandler(
   input: ProjectCreateFromIdeaInput,
@@ -38,7 +41,7 @@ export async function projectCreateFromIdeaHandler(
     logs.push("Generated idea brief markdown");
 
     // Create the project
-    const { data: project, error: projectError } = await supabase
+    const { data: projectData, error: projectError } = await supabase
       .from("projects")
       .insert({
         user_id: context.userId,
@@ -49,6 +52,8 @@ export async function projectCreateFromIdeaHandler(
       })
       .select()
       .single();
+
+    const project = projectData as unknown as ProjectRow | null;
 
     if (projectError || !project) {
       return { success: false, error: projectError?.message || "Failed to create project", logs };
@@ -150,12 +155,14 @@ export async function projectGenerateOutlineHandler(
     const supabase = await createServiceClient();
 
     // Get the project and associated idea
-    const { data: project, error: projectError } = await supabase
+    const { data: projectData, error: projectError } = await supabase
       .from("projects")
       .select("*, ideas(*)")
       .eq("id", input.project_id)
       .eq("user_id", context.userId)
       .single();
+
+    const project = projectData as unknown as (ProjectRow & { ideas: unknown }) | null;
 
     if (projectError || !project) {
       return { success: false, error: "Project not found", logs };
@@ -177,7 +184,7 @@ export async function projectGenerateOutlineHandler(
     await supabase
       .from("projects")
       .update({
-        outline: result.outline,
+        outline: result.outline as any,
         status: "outline",
       })
       .eq("id", input.project_id);
@@ -213,12 +220,14 @@ export async function projectGenerateTitlesHandler(
     const supabase = await createServiceClient();
 
     // Get the project
-    const { data: project, error: projectError } = await supabase
+    const { data: projectData, error: projectError } = await supabase
       .from("projects")
       .select("*, ideas(*)")
       .eq("id", input.project_id)
       .eq("user_id", context.userId)
       .single();
+
+    const project = projectData as unknown as (ProjectRow & { ideas: unknown }) | null;
 
     if (projectError || !project) {
       return { success: false, error: "Project not found", logs };
@@ -240,7 +249,7 @@ export async function projectGenerateTitlesHandler(
     await supabase
       .from("projects")
       .update({
-        title_variants: result.titles,
+        title_variants: result.titles as any,
       })
       .eq("id", input.project_id);
 

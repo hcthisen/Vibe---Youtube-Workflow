@@ -4,6 +4,10 @@ import type {
   VideoUploadFinalizeOutput,
 } from "../schemas";
 import { createServiceClient } from "@/lib/supabase/service";
+import type { Database } from "@/lib/database.types";
+
+type ProjectAssetRow = Database["public"]["Tables"]["project_assets"]["Row"];
+type JobRow = Database["public"]["Tables"]["jobs"]["Row"];
 
 export async function videoUploadFinalizeHandler(
   input: VideoUploadFinalizeInput,
@@ -29,7 +33,7 @@ export async function videoUploadFinalizeHandler(
     }
 
     // Create asset record
-    const { data: asset, error: assetError } = await supabase
+    const { data: assetData, error: assetError } = await supabase
       .from("project_assets")
       .insert({
         user_id: context.userId,
@@ -45,6 +49,8 @@ export async function videoUploadFinalizeHandler(
       .select()
       .single();
 
+    const asset = assetData as unknown as ProjectAssetRow | null;
+
     if (assetError || !asset) {
       return { success: false, error: assetError?.message || "Failed to create asset", logs };
     }
@@ -52,14 +58,21 @@ export async function videoUploadFinalizeHandler(
     logs.push(`Created asset: ${asset.id}`);
 
     // Get user profile for processing settings
-    const { data: profile } = await supabase
+    const { data: profileData } = await supabase
       .from("profiles")
       .select("silence_threshold_ms, retake_markers, intro_transition_enabled")
       .eq("id", context.userId)
       .single();
+    const profile = profileData as
+      | {
+          silence_threshold_ms: number;
+          retake_markers: unknown;
+          intro_transition_enabled: boolean;
+        }
+      | null;
 
     // Create processing job
-    const { data: job, error: jobError } = await supabase
+    const { data: jobData, error: jobError } = await supabase
       .from("jobs")
       .insert({
         user_id: context.userId,
@@ -69,12 +82,14 @@ export async function videoUploadFinalizeHandler(
         input: {
           asset_id: asset.id,
           silence_threshold_ms: profile?.silence_threshold_ms || 500,
-          retake_markers: profile?.retake_markers || [],
+          retake_markers: (profile?.retake_markers as any) || [],
           apply_intro_transition: profile?.intro_transition_enabled || false,
-        },
+        } as any,
       })
       .select()
       .single();
+
+    const job = jobData as unknown as JobRow | null;
 
     if (jobError || !job) {
       return { success: false, error: jobError?.message || "Failed to create job", logs };

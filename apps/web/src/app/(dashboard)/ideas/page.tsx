@@ -2,6 +2,12 @@ import { createClient } from "@/lib/supabase/server";
 import { OutlierSearch } from "@/components/ideas/OutlierSearch";
 import { DeepResearch } from "@/components/ideas/DeepResearch";
 import { SavedIdeas } from "@/components/ideas/SavedIdeas";
+import type { Database } from "@/lib/database.types";
+
+type IdeaRow = Database["public"]["Tables"]["ideas"]["Row"];
+type VideoRow = Database["public"]["Tables"]["videos"]["Row"];
+type ProjectRow = Database["public"]["Tables"]["projects"]["Row"];
+type ChannelRow = Database["public"]["Tables"]["channels"]["Row"];
 
 export default async function IdeasPage({
   searchParams,
@@ -17,39 +23,71 @@ export default async function IdeasPage({
     return null;
   }
 
-  // Fetch ideas with their related videos
-  const { data: savedIdeas, error: ideasError } = await supabase
+  // Fetch ideas (we join videos/projects manually to avoid embedded select typing issues)
+  const { data: savedIdeasData, error: ideasError } = await supabase
     .from("ideas")
-    .select("*, videos(*)")
+    .select("*")
     .eq("user_id", user.id)
     .in("status", ["saved", "project_created"])
     .order("created_at", { ascending: false });
+
+  const savedIdeas = (savedIdeasData as unknown as IdeaRow[] | null) ?? [];
 
   if (ideasError) {
     console.error("Error fetching ideas:", ideasError);
   }
 
   // Fetch projects for these ideas
-  const ideaIds = savedIdeas?.map((idea) => idea.id) || [];
-  const { data: projects } = ideaIds.length > 0
+  const ideaIds = savedIdeas.map((idea) => idea.id);
+  const { data: projectsData } = ideaIds.length > 0
     ? await supabase
         .from("projects")
-        .select("*")
+        .select("id, idea_id, title, status")
         .eq("user_id", user.id)
         .in("idea_id", ideaIds)
     : { data: null };
 
-  // Merge projects into ideas
-  const ideasWithProjects = savedIdeas?.map((idea) => ({
-    ...idea,
-    projects: projects?.find((p) => p.idea_id === idea.id) || null,
-  })) || [];
+  const projects =
+    (projectsData as unknown as Pick<ProjectRow, "id" | "idea_id" | "title" | "status">[] | null) ??
+    [];
 
-  const { data: channel } = await supabase
+  const projectsByIdeaId = new Map(projects.map((p) => [p.idea_id, p]));
+
+  // Fetch source videos referenced by these ideas
+  const sourceVideoIds = Array.from(
+    new Set(savedIdeas.map((idea) => idea.source_video_id).filter(Boolean))
+  ) as string[];
+
+  const { data: videosData } = sourceVideoIds.length
+    ? await supabase
+        .from("videos")
+        .select("id, title, thumbnail_url, views_count, channel_name")
+        .in("id", sourceVideoIds)
+    : { data: null };
+
+  const videos =
+    (videosData as unknown as Pick<
+      VideoRow,
+      "id" | "title" | "thumbnail_url" | "views_count" | "channel_name"
+    >[] | null) ?? [];
+
+  const videosById = new Map(videos.map((v) => [v.id, v]));
+
+  // Merge projects + videos into ideas
+  const ideasWithProjects = savedIdeas.map((idea) => ({
+    ...idea,
+    videos: idea.source_video_id
+      ? videosById.get(idea.source_video_id) ?? null
+      : null,
+    projects: projectsByIdeaId.get(idea.id) ?? null,
+  }));
+
+  const { data: channelData } = await supabase
     .from("channels")
     .select("baseline_keywords")
     .eq("user_id", user.id)
     .single();
+  const channel = channelData as unknown as Pick<ChannelRow, "baseline_keywords"> | null;
 
   const params = await searchParams;
   const activeTab = params.tab || "outliers";

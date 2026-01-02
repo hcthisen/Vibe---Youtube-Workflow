@@ -1,8 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
+import type { Database } from "@/lib/database.types";
 import { redirect } from "next/navigation";
 import { ProfileForm } from "@/components/settings/ProfileForm";
 import { HeadshotManager } from "@/components/settings/HeadshotManager";
 import { ChannelBaseline } from "@/components/settings/ChannelBaseline";
+
+type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
+type HeadshotRow = Database["public"]["Tables"]["headshots"]["Row"];
+type ChannelRow = Database["public"]["Tables"]["channels"]["Row"];
 
 export default async function SettingsPage({
   searchParams,
@@ -18,23 +23,26 @@ export default async function SettingsPage({
     redirect("/login");
   }
 
-  const { data: profile } = await supabase
+  const { data: profileData } = await supabase
     .from("profiles")
     .select("*")
     .eq("id", user.id)
     .single();
+  const profile = profileData as unknown as ProfileRow | null;
 
-  const { data: headshots } = await supabase
+  const { data: headshotsData } = await supabase
     .from("headshots")
     .select("*")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
+  const headshots = (headshotsData as unknown as HeadshotRow[] | null) ?? [];
 
-  const { data: channel } = await supabase
+  const { data: channelData } = await supabase
     .from("channels")
     .select("*")
     .eq("user_id", user.id)
     .single();
+  const channel = channelData as unknown as ChannelRow | null;
 
   const params = await searchParams;
   const activeTab = params.tab || "profile";
@@ -83,7 +91,7 @@ export default async function SettingsPage({
         )}
         {activeTab === "headshots" && (
           <HeadshotManager
-            headshots={headshots || []}
+            headshots={headshots}
             userId={user.id}
           />
         )}

@@ -18,7 +18,7 @@ interface Outline {
 interface OutlineEditorProps {
   projectId: string;
   outline: Record<string, unknown> | null;
-  titleVariants: string[] | null;
+  titleVariants: Array<{ title: string; style: string; reasoning?: string }> | null;
 }
 
 export function OutlineEditor({ projectId, outline, titleVariants }: OutlineEditorProps) {
@@ -190,7 +190,7 @@ export function OutlineEditor({ projectId, outline, titleVariants }: OutlineEdit
 
         {titleVariants && titleVariants.length > 0 ? (
           <div className="space-y-2">
-            {(titleVariants as Array<{ title: string; style: string }>).map((variant, i) => (
+            {titleVariants.map((variant, i) => (
               <div
                 key={i}
                 className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg"

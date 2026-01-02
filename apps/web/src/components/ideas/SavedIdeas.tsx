@@ -177,7 +177,7 @@ export function SavedIdeas({ ideas }: SavedIdeasProps) {
           </div>
 
           {/* Hook Options */}
-          {idea.hook_options && Array.isArray(idea.hook_options) && idea.hook_options.length > 0 && (
+          {Array.isArray(idea.hook_options) && idea.hook_options.length > 0 && (
             <div className="border-t border-gray-700 p-4 bg-gray-900/30">
               <h5 className="text-xs font-medium text-gray-400 mb-2">HOOK OPTIONS</h5>
               <div className="flex flex-wrap gap-2">

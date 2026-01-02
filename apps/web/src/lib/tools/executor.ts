@@ -1,6 +1,9 @@
 import { createServiceClient } from "@/lib/supabase/service";
+import type { Database } from "@/lib/database.types";
 import type { ToolRunContext, ToolResult, ToolDefinition } from "./registry";
 import { getTool } from "./registry";
+
+type ToolRunRow = Database["public"]["Tables"]["tool_runs"]["Row"];
 
 export interface ExecuteToolOptions {
   userId: string;
@@ -44,7 +47,7 @@ export async function executeTool<T = unknown>(
       tool_name: toolName,
       tool_version: tool.version,
       status: "started",
-      input: input as object,
+      input: input as any,
     })
     .select()
     .single();
@@ -59,7 +62,7 @@ export async function executeTool<T = unknown>(
     };
   }
 
-  const runId = toolRun.id;
+  const runId = (toolRun as unknown as ToolRunRow).id;
   const logs: string[] = [];
 
   try {
@@ -110,7 +113,7 @@ export async function executeTool<T = unknown>(
 
       await updateToolRun(supabase, runId, {
         status: "succeeded",
-        output: result.data as object,
+        output: result.data as any,
         logs: [...logs, ...(result.logs || [])].join("\n"),
         duration_ms: durationMs,
       });
@@ -164,7 +167,7 @@ async function updateToolRun(
   runId: string,
   updates: {
     status: string;
-    output: object | null;
+    output: any;
     logs: string;
     duration_ms: number;
   }

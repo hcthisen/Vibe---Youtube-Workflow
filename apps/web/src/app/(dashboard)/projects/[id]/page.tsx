@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import type { Database } from "@/lib/database.types";
 import { redirect, notFound } from "next/navigation";
 import { ProjectHeader } from "@/components/projects/ProjectHeader";
 import { IdeaBrief } from "@/components/projects/IdeaBrief";
@@ -7,6 +8,10 @@ import { VideoUploader } from "@/components/projects/VideoUploader";
 import { VideoPlayer } from "@/components/projects/VideoPlayer";
 import { TranscriptViewer } from "@/components/projects/TranscriptViewer";
 import { ThumbnailGallery } from "@/components/projects/ThumbnailGallery";
+
+type ProjectRow = Database["public"]["Tables"]["projects"]["Row"];
+type ProjectAssetRow = Database["public"]["Tables"]["project_assets"]["Row"];
+type JobRow = Database["public"]["Tables"]["jobs"]["Row"];
 
 export default async function ProjectPage({
   params,
@@ -24,39 +29,45 @@ export default async function ProjectPage({
     redirect("/login");
   }
 
-  const { data: project, error } = await supabase
+  const { data: projectData, error } = await supabase
     .from("projects")
-    .select("*, ideas(*)")
+    .select("*")
     .eq("id", id)
     .eq("user_id", user.id)
     .single();
+
+  const project = projectData as unknown as ProjectRow | null;
 
   if (error || !project) {
     notFound();
   }
 
-  const { data: assets } = await supabase
+  const { data: assetsData } = await supabase
     .from("project_assets")
     .select("*")
     .eq("project_id", id)
     .order("created_at", { ascending: false });
 
-  const { data: jobs } = await supabase
+  const assets = (assetsData as unknown as ProjectAssetRow[] | null) ?? [];
+
+  const { data: jobsData } = await supabase
     .from("jobs")
     .select("*")
     .eq("project_id", id)
     .order("created_at", { ascending: false });
 
+  const jobs = (jobsData as unknown as JobRow[] | null) ?? [];
+
   // Categorize assets
-  const rawVideo = assets?.find((a) => a.type === "raw_video");
-  const processedVideo = assets?.find((a) => a.type === "processed_video");
-  const transcript = assets?.find((a) => a.type === "transcript");
-  const editReport = assets?.find((a) => a.type === "edit_report");
-  const thumbnails = assets?.filter((a) => a.type === "thumbnail") || [];
+  const rawVideo = assets.find((a) => a.type === "raw_video");
+  const processedVideo = assets.find((a) => a.type === "processed_video");
+  const transcript = assets.find((a) => a.type === "transcript");
+  const editReport = assets.find((a) => a.type === "edit_report");
+  const thumbnails = assets.filter((a) => a.type === "thumbnail");
 
   // Check for running jobs
-  const runningJob = jobs?.find((j) => j.status === "running" || j.status === "queued");
-  const failedJob = jobs?.find((j) => j.status === "failed");
+  const runningJob = jobs.find((j) => j.status === "running" || j.status === "queued");
+  const failedJob = jobs.find((j) => j.status === "failed");
 
   return (
     <div className="space-y-8">
@@ -78,7 +89,11 @@ export default async function ProjectPage({
             <OutlineEditor
               projectId={project.id}
               outline={project.outline as Record<string, unknown> | null}
-              titleVariants={project.title_variants as string[] | null}
+              titleVariants={
+                project.title_variants as
+                  | Array<{ title: string; style: string; reasoning?: string }>
+                  | null
+              }
             />
           </section>
 

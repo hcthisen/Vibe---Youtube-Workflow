@@ -1,6 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
+import type { Database } from "@/lib/database.types";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+
+type ToolRunRow = Database["public"]["Tables"]["tool_runs"]["Row"];
 
 export default async function ToolRunDetailPage({
   params,
@@ -10,11 +13,13 @@ export default async function ToolRunDetailPage({
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: run, error } = await supabase
+  const { data: runData, error } = await supabase
     .from("tool_runs")
     .select("*")
     .eq("id", id)
     .single();
+
+  const run = runData as unknown as ToolRunRow | null;
 
   if (error || !run) {
     notFound();

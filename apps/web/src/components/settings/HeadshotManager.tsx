@@ -130,7 +130,7 @@ export function HeadshotManager({ headshots, userId }: HeadshotManagerProps) {
           }
 
           // Create headshot record
-          const { data: headshot, error: dbError } = await supabase
+          const { data: headshotData, error: dbError } = await supabase
             .from("headshots")
             .insert({
               user_id: userId,
@@ -145,7 +145,8 @@ export function HeadshotManager({ headshots, userId }: HeadshotManagerProps) {
           }
 
           // Trigger pose analysis
-          if (headshot) {
+          const headshot = headshotData as unknown as { id: string } | null;
+          if (headshot?.id) {
             analyzePose(headshot.id);
           }
         }
@@ -236,7 +237,7 @@ export function HeadshotManager({ headshots, userId }: HeadshotManagerProps) {
         }
 
         // Create headshot record with pose_bucket hint
-        const { data: headshot, error: dbError } = await supabase
+        const { data: headshotData, error: dbError } = await supabase
           .from("headshots")
           .insert({
             user_id: userId,
@@ -252,7 +253,8 @@ export function HeadshotManager({ headshots, userId }: HeadshotManagerProps) {
         }
 
         // Trigger pose analysis
-        if (headshot) {
+        const headshot = headshotData as unknown as { id: string } | null;
+        if (headshot?.id) {
           analyzePose(headshot.id);
         }
       }

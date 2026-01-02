@@ -15,14 +15,14 @@ export default async function DebugPage({
     return null;
   }
 
-  const { data: toolRuns } = await supabase
+  const { data: toolRunsData } = await supabase
     .from("tool_runs")
     .select("*")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
     .limit(50);
 
-  const { data: jobs } = await supabase
+  const { data: jobsData } = await supabase
     .from("jobs")
     .select("*, projects(title)")
     .eq("user_id", user.id)
@@ -66,8 +66,12 @@ export default async function DebugPage({
       </div>
 
       {/* Tab Content */}
-      {activeTab === "tool_runs" && <ToolRunsTable runs={toolRuns || []} />}
-      {activeTab === "jobs" && <JobsTable jobs={jobs || []} />}
+      {activeTab === "tool_runs" && (
+        <ToolRunsTable runs={(toolRunsData as unknown as ToolRun[] | null) ?? []} />
+      )}
+      {activeTab === "jobs" && (
+        <JobsTable jobs={(jobsData as unknown as Job[] | null) ?? []} />
+      )}
     </div>
   );
 }

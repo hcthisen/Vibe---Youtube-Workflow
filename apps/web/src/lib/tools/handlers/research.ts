@@ -43,7 +43,7 @@ export async function channelImportLatest20Handler(
         published_at: video.published_at,
         views_count: video.views_count,
         channel_name: result.channel_name,
-        raw_provider_payload: video.raw_payload || {},
+        raw_provider_payload: (video.raw_payload || {}) as any,
       }, {
         onConflict: "user_id,youtube_video_id",
       });

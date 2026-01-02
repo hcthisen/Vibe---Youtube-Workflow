@@ -193,7 +193,7 @@ export function ChannelBaseline({ channel, userId }: ChannelBaselineProps) {
       
       const { error: dbError } = await supabase.from("channels").update({
         baseline_video_ids: updatedVideoIds,
-        baseline_transcripts: updatedTranscripts,
+        baseline_transcripts: updatedTranscripts as any,
       }).eq("id", channel.id);
 
       if (dbError) throw dbError;
@@ -413,7 +413,7 @@ export function ChannelBaseline({ channel, userId }: ChannelBaselineProps) {
         baseline_video_ids: mergedVideoIds,
         baseline_summary: generatedSummary,
         baseline_keywords: generatedKeywords,
-        baseline_transcripts: mergedTranscripts,
+        baseline_transcripts: mergedTranscripts as any,
         avg_views: avgViews,
       });
 

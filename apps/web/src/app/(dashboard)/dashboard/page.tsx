@@ -107,7 +107,7 @@ async function SetupChecklist() {
   
   const { data: profile } = await supabase
     .from("profiles")
-    .select("*")
+    .select("id")
     .single();
 
   const { data: channel } = await supabase
@@ -116,14 +116,14 @@ async function SetupChecklist() {
     .limit(1)
     .single();
 
-  const { data: headshots } = await supabase
+  const { count: headshotsCount } = await supabase
     .from("headshots")
     .select("id", { count: "exact", head: true });
 
   const checks = [
     {
       name: "Configure profile settings",
-      done: !!profile?.silence_threshold_ms,
+      done: !!profile,
       href: "/settings",
     },
     {
@@ -133,7 +133,7 @@ async function SetupChecklist() {
     },
     {
       name: "Upload headshots",
-      done: (headshots?.count || 0) >= 3,
+      done: (headshotsCount || 0) >= 3,
       href: "/settings?tab=headshots",
     },
   ];

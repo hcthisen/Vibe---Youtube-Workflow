@@ -1,5 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
+import type { Database } from "@/lib/database.types";
 import Link from "next/link";
+
+type ProjectRow = Database["public"]["Tables"]["projects"]["Row"];
+type ProjectAssetRow = Database["public"]["Tables"]["project_assets"]["Row"];
+type ProjectWithAssets = ProjectRow & {
+  project_assets: ProjectAssetRow[] | null;
+};
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   research: { label: "Research", color: "bg-blue-500" },
@@ -24,11 +31,14 @@ export default async function ProjectsPage({
     return null;
   }
 
-  const { data: projects } = await supabase
+  const { data: projectsData } = await supabase
     .from("projects")
     .select("*, ideas(*), project_assets(*)")
     .eq("user_id", user.id)
     .order("updated_at", { ascending: false });
+
+  const projects =
+    (projectsData as unknown as ProjectWithAssets[] | null) ?? [];
 
   const params = await searchParams;
 
@@ -50,7 +60,7 @@ export default async function ProjectsPage({
       </div>
 
       {/* Projects Grid */}
-      {projects && projects.length > 0 ? (
+      {projects.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {projects.map((project) => {
             const status = STATUS_LABELS[project.status] || STATUS_LABELS.research;

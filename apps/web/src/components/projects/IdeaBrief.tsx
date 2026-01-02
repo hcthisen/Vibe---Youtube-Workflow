@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactElement } from "react";
 import { useRouter } from "next/navigation";
 
 interface IdeaBriefProps {
@@ -103,7 +103,7 @@ export function IdeaBrief({ projectId, markdown }: IdeaBriefProps) {
 function MarkdownViewer({ content }: { content: string }) {
   // Simple markdown parsing
   const lines = content.split("\n");
-  const elements: JSX.Element[] = [];
+  const elements: ReactElement[] = [];
   let currentList: string[] = [];
   let listType: "ul" | "ol" | null = null;
 

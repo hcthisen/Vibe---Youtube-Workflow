@@ -1,5 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
+import type { Database } from "@/lib/database.types";
 import { NextRequest, NextResponse } from "next/server";
+
+type JobRow = Database["public"]["Tables"]["jobs"]["Row"];
 
 export async function GET(
   request: NextRequest,
@@ -18,12 +21,14 @@ export async function GET(
     }
 
     // Get job with ownership verification
-    const { data: job, error } = await supabase
+    const { data: jobData, error } = await supabase
       .from("jobs")
       .select("*")
       .eq("id", id)
       .eq("user_id", user.id)
       .single();
+
+    const job = jobData as unknown as JobRow | null;
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });

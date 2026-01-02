@@ -1,6 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
+import type { Database } from "@/lib/database.types";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+
+type JobRow = Database["public"]["Tables"]["jobs"]["Row"];
 
 export default async function JobDetailPage({
   params,
@@ -10,15 +13,29 @@ export default async function JobDetailPage({
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: job, error } = await supabase
+  const { data: jobData, error } = await supabase
     .from("jobs")
-    .select("*, projects(title)")
+    .select("*")
     .eq("id", id)
     .single();
+
+  const job = jobData as unknown as JobRow | null;
 
   if (error || !job) {
     notFound();
   }
+
+  const projectTitle = job.project_id
+    ? (
+        (
+          await supabase
+            .from("projects")
+            .select("title")
+            .eq("id", job.project_id)
+            .single()
+        ).data as unknown as { title: string } | null
+      )?.title ?? null
+    : null;
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -48,8 +65,8 @@ export default async function JobDetailPage({
         </Link>
         <div>
           <h1 className="text-2xl font-bold text-white">{job.type}</h1>
-          {job.projects && (
-            <p className="text-gray-400 text-sm">Project: {job.projects.title}</p>
+          {projectTitle && (
+            <p className="text-gray-400 text-sm">Project: {projectTitle}</p>
           )}
         </div>
         <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(job.status)}`}>
