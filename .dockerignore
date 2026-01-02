@@ -71,9 +71,10 @@ PRD.md
 
 # Templates and examples
 Initial Templates - */
+!Initial Templates - execution/video_effects/
+!Initial Templates - execution/video_effects/**
 
 # Docker
 docker-compose.yml
 Dockerfile*
 .dockerignore
-
