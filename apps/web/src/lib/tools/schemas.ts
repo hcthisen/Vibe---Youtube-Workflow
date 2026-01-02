@@ -236,9 +236,6 @@ export const thumbnailIterateInputSchema = z.object({
 export const thumbnailIterateOutputSchema = z.object({
   job_id: z.string().uuid(),
   status: z.string(),
-      url: z.string(),
-    })
-  ),
 });
 
 // ============================================================================
@@ -271,4 +268,3 @@ export type ThumbnailGenerateFromReferenceInput = z.infer<typeof thumbnailGenera
 export type ThumbnailGenerateFromReferenceOutput = z.infer<typeof thumbnailGenerateFromReferenceOutputSchema>;
 export type ThumbnailIterateInput = z.infer<typeof thumbnailIterateInputSchema>;
 export type ThumbnailIterateOutput = z.infer<typeof thumbnailIterateOutputSchema>;
-
