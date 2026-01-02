@@ -1238,6 +1238,8 @@ Some scripts also require OAuth credentials:
 6. ✅ Use `DATABASE_URL` for direct PostgreSQL access
 7. ✅ Check `database.types.ts` for TypeScript types
 8. ✅ Use **Initial Templates scripts** for local video editing, thumbnails, and research
+9. ✅ Keep `apps/web/src/lib/tools/schemas.ts` syntactically valid; a stray fragment will break `next build`
+10. ✅ Validate deployment-critical changes by running `npm run build --workspace=apps/web` with required env vars set (at minimum `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`)
 
 **Common Workflows**:
 
@@ -1256,4 +1258,3 @@ Some scripts also require OAuth credentials:
 ---
 
 **Questions?** Check the migration files in `supabase/migrations/` for schema details, or search the codebase for usage examples.
-
