@@ -89,11 +89,62 @@ print('✅ All imports successful')
 "
 
 echo ""
-echo "🎉 Setup complete!"
+echo "🎉 Basic setup complete!"
+echo ""
+
+# Check for Node.js (optional, for intro transitions)
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "📦 Optional: 3D Intro Transitions"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo "The worker can add cinematic 3D intro transitions to videos."
+echo "This feature requires Node.js and Remotion."
+echo ""
+
+if command -v node &> /dev/null; then
+    NODE_VERSION=$(node --version)
+    echo "✅ Node.js found: $NODE_VERSION"
+    echo ""
+    
+    # Check if Remotion is installed
+    VIDEO_EFFECTS_DIR="../../Initial Templates - execution/video_effects"
+    if [ -d "$VIDEO_EFFECTS_DIR/node_modules" ]; then
+        echo "✅ Remotion dependencies already installed"
+    else
+        echo "⚠️  Remotion dependencies not installed"
+        echo ""
+        echo "To enable intro transitions, run:"
+        echo "  cd \"$VIDEO_EFFECTS_DIR\""
+        echo "  npm install"
+        echo "  cd -"
+    fi
+else
+    echo "ℹ️  Node.js not found (optional for intro transitions)"
+    echo ""
+    echo "To enable intro transitions:"
+    echo ""
+    echo "1. Install Node.js:"
+    echo "   macOS:  brew install node"
+    echo "   Ubuntu: curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -"
+    echo "           sudo apt-get install -y nodejs"
+    echo ""
+    echo "2. Install Remotion dependencies:"
+    echo "   cd \"../../Initial Templates - execution/video_effects\""
+    echo "   npm install"
+    echo ""
+    echo "Without Node.js, videos will still process normally"
+    echo "(VAD, transcription, etc.) - just without transitions."
+fi
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 echo "Next steps:"
 echo "1. Edit .env with your credentials"
-echo "2. Run: python3 worker.py"
+echo "2. (Optional) Install Node.js + Remotion for intro transitions"
+echo "3. Run: python3 worker.py"
+echo ""
+echo "📚 For more info, see: workers/media/README.md"
 echo ""
 echo "Test with project: http://localhost:3000/projects/2f597dc3-1ee2-476e-ac8d-472e02e5b58b"
 

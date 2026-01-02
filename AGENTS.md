@@ -465,6 +465,230 @@ const { data } = await supabase
 
 ---
 
+### LLM-Based Retake Detection
+
+The video processing pipeline includes intelligent retake marker detection powered by OpenAI GPT-4. When users say phrases like "cut cut" during recording, the system uses AI to analyze the transcript and determine optimal cut points.
+
+#### How It Works
+
+1. **User Configuration**: Users set retake marker phrases in Settings (`/dashboard/settings`)
+2. **Video Upload**: Raw video is uploaded to a project
+3. **Processing Pipeline**:
+   - VAD-based silence removal (Silero VAD)
+   - Whisper transcription with word-level timestamps
+   - Retake marker detection in transcript
+   - **LLM Analysis**: GPT-4 analyzes context around markers to determine cuts
+   - FFmpeg applies cuts and concatenates remaining segments
+4. **Edit Report**: Detailed report includes LLM reasoning and confidence scores
+
+#### Architecture Flow
+
+```
+Video Upload → VAD Silence Removal → Whisper Transcription
+     ↓
+Retake Marker Search (e.g., "cut cut")
+     ↓
+Extract Context Window (default: 30s before/after marker)
+     ↓
+LLM Analysis (GPT-4)
+  - Identifies mistake start point
+  - Determines natural cut boundaries
+  - Returns cut timestamps + confidence scores
+     ↓
+FFmpeg Cut & Concatenate → Processed Video + Edit Report
+```
+
+#### Configuration Options
+
+Users can configure retake detection in their profile settings:
+
+```typescript
+// Profile settings (profiles table)
+{
+  retake_markers: string[],                    // Default: []
+  retake_context_window_seconds: number,       // Default: 30, Range: 10-120
+  retake_min_confidence: number,               // Default: 0.7, Range: 0.0-1.0
+  retake_prefer_sentence_boundaries: boolean,  // Default: true
+  llm_model: "gpt-4" | "gpt-4-turbo" | "gpt-4o" // Default: "gpt-4"
+}
+```
+
+#### Key Features
+
+**1. Flexible Cut Length Detection**
+- Handles 2-second mistakes to 30+ second false starts
+- Analyzes context to find actual mistake start point
+- Not limited to fixed lookback duration
+
+**2. Pattern Recognition**
+- `quick_fix`: Short 2-5 second mistakes
+- `full_redo`: Long 10+ second segments
+- `multiple_attempts`: Multiple retakes in succession
+
+**3. Sentence Boundary Detection**
+- Identifies natural break points based on punctuation and pauses
+- Prefers cutting at sentence boundaries for smoother flow
+- Configurable via `retake_prefer_sentence_boundaries`
+
+**4. Confidence Scoring**
+- Each cut includes 0-1 confidence score
+- Low confidence triggers fallback heuristics
+- Logged in edit reports for manual review
+
+**5. Robust Fallback**
+- Enhanced fallback uses sentence boundaries and VAD segments
+- Adapts lookback based on speech density
+- Always provides reasonable results even if LLM fails
+
+#### Example Usage (Job Input)
+
+```typescript
+// When creating a video processing job
+const { data: job } = await supabase
+  .from("jobs")
+  .insert({
+    user_id: userId,
+    type: "video_process",
+    status: "queued",
+    input: {
+      asset_id: "...",
+      silence_threshold_ms: 500,
+      retake_markers: ["cut cut", "oops"],
+      retake_context_window_seconds: 30,
+      retake_min_confidence: 0.7,
+      retake_prefer_sentence_boundaries: true,
+      llm_model: "gpt-4",
+      apply_intro_transition: false
+    }
+  });
+```
+
+#### Edit Report Structure
+
+The processed video includes a detailed edit report:
+
+```json
+{
+  "original_duration_ms": 180000,
+  "after_silence_removal_ms": 150000,
+  "after_retake_cuts_ms": 140000,
+  "final_duration_ms": 140000,
+  "silence_removed_ms": 30000,
+  "retake_cuts_detailed": [
+    {
+      "start_time": 45.2,
+      "end_time": 52.8,
+      "duration_seconds": 7.6,
+      "reason": "Removed false start before 'cut cut' at 52.8s",
+      "confidence": 0.92,
+      "pattern": "full_redo",
+      "method": "llm",
+      "llm_reasoning": "Speaker started explaining concept X but restarted completely. Natural sentence boundary at 45.2s where previous thought concluded."
+    },
+    {
+      "start_time": 52.8,
+      "end_time": 53.5,
+      "duration_seconds": 0.7,
+      "reason": "Retake phrase 'cut cut'",
+      "confidence": 0.95,
+      "pattern": "retake_phrase",
+      "method": "llm"
+    }
+  ],
+  "retake_analysis_settings": {
+    "llm_model": "gpt-4",
+    "context_window_seconds": 30,
+    "min_confidence": 0.7,
+    "prefer_sentence_boundaries": true
+  }
+}
+```
+
+#### Worker Implementation
+
+**Location**: `workers/media/utils/llm_cuts.py`
+
+Key functions:
+- `analyze_retake_cuts()` - Main LLM analysis function
+- `extract_context_window()` - Get transcript context around markers
+- `identify_sentence_boundaries()` - Find natural cut points
+- `detect_retake_pattern()` - Classify retake type
+- `generate_fallback_cuts()` - Enhanced heuristic fallback
+
+**Required Environment Variables**:
+```bash
+OPENAI_API_KEY=sk-...  # Required for LLM retake analysis
+```
+
+#### Error Handling
+
+1. **LLM API Failures**: 
+   - Automatic retry with exponential backoff (max 3 attempts)
+   - Falls back to enhanced heuristics
+   - Logs failure reason and fallback method
+
+2. **Low Confidence Cuts**:
+   - Cuts below `retake_min_confidence` are filtered out
+   - Logged for manual review
+   - Fallback heuristic used instead
+
+3. **No Context Available**:
+   - Skips LLM analysis for that marker
+   - Uses fallback heuristic based on VAD segments
+
+#### Troubleshooting
+
+**Issue**: LLM cuts are too aggressive (cutting too much)
+
+**Solution**: 
+- Increase `retake_min_confidence` to 0.8 or 0.9
+- Enable `retake_prefer_sentence_boundaries`
+- Review edit report's `llm_reasoning` to understand decisions
+
+---
+
+**Issue**: LLM cuts are too conservative (not cutting enough)
+
+**Solution**:
+- Decrease `retake_min_confidence` to 0.5 or 0.6
+- Increase `retake_context_window_seconds` to 45 or 60
+- Check transcript quality (Whisper accuracy)
+
+---
+
+**Issue**: LLM analysis failing consistently
+
+**Solution**:
+- Verify `OPENAI_API_KEY` is set in worker environment
+- Check OpenAI API usage limits
+- Verify selected `llm_model` is available
+- Review worker logs for specific error messages
+- Fallback heuristics will still work
+
+---
+
+**Issue**: Cuts don't align with natural pauses
+
+**Solution**:
+- Enable `retake_prefer_sentence_boundaries` (should be default)
+- Increase `silence_threshold_ms` for better VAD segment detection
+- Use `gpt-4o` model for better context understanding
+
+#### Performance Notes
+
+- **LLM Analysis**: ~2-5 seconds per retake marker (depends on context window size)
+- **Cost**: ~$0.01-0.03 per video (typical 2-3 retakes with GPT-4)
+- **Fallback**: < 0.1 seconds (instant heuristic)
+- **Recommended**: Use `gpt-4-turbo` for 50% cost reduction with similar quality
+
+#### Related Documentation
+
+- **Full Implementation Guide**: `workers/media/docs/RETAKE_DETECTION.md`
+- **Worker README**: `workers/media/README.md` (section: Retake Marker Detection)
+- **PRD Section**: `PRD.md` (section 6.8: Video processing pipeline)
+
+---
+
 ## Database Schema Overview
 
 ### Core Tables

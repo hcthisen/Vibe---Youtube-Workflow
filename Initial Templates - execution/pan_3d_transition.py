@@ -249,14 +249,17 @@ export const DynamicRoot: React.FC = () => {{
 '''
 
     # Write dynamic root
+    print(f"   Writing React component...")
     dynamic_root_path = REMOTION_DIR / "src" / "DynamicRoot.tsx"
     with open(dynamic_root_path, "w") as f:
         f.write(dynamic_root)
+    print(f"   ✅ DynamicRoot.tsx written")
 
     # Write dynamic index
     dynamic_index_path = REMOTION_DIR / "src" / "dynamic-index.ts"
     with open(dynamic_index_path, "w") as f:
         f.write('import { registerRoot } from "remotion";\nimport { DynamicRoot } from "./DynamicRoot";\nregisterRoot(DynamicRoot);')
+    print(f"   ✅ dynamic-index.ts written")
 
     # Render - use absolute path for output
     abs_output_path = os.path.abspath(output_path)
@@ -266,13 +269,32 @@ export const DynamicRoot: React.FC = () => {{
         str(dynamic_index_path),
         "Pan3D",
         abs_output_path,
+        "--log", "info",  # Show progress
     ]
 
-    result = subprocess.run(cmd, cwd=str(REMOTION_DIR), capture_output=True, text=True)
-    if result.returncode != 0:
-        print(f"Render error: {result.stderr}")
-        raise RuntimeError("Remotion render failed")
+    print(f"   🎬 Starting Remotion render...", flush=True)
+    print(f"      Command: npx remotion render {dynamic_index_path} Pan3D {abs_output_path}", flush=True)
+    print(f"      Working directory: {REMOTION_DIR}", flush=True)
+    print(f"      (This may take 30-60 seconds...)", flush=True)
+    print(flush=True)
+    
+    # Stream output instead of capturing it, with timeout
+    try:
+        result = subprocess.run(
+            cmd, 
+            cwd=str(REMOTION_DIR), 
+            capture_output=False,  # Stream to console
+            text=True,
+            timeout=120  # 2 minute timeout
+        )
+        
+        if result.returncode != 0:
+            raise RuntimeError(f"Remotion render failed with exit code {result.returncode}")
+    
+    except subprocess.TimeoutExpired:
+        raise RuntimeError("Remotion render timed out after 2 minutes")
 
+    print()
     print(f"✅ Rendered to {output_path}")
 
     # Cleanup

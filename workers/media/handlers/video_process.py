@@ -30,8 +30,15 @@ class VideoProcessHandler(BaseHandler):
         try:
             asset_id = input_data.get("asset_id")
             silence_threshold_ms = input_data.get("silence_threshold_ms", 500)
+            retake_detection_enabled = input_data.get("retake_detection_enabled", False)
             retake_markers = input_data.get("retake_markers", [])
             apply_intro_transition = input_data.get("apply_intro_transition", False)
+            
+            # Enhanced retake detection settings
+            retake_context_window = input_data.get("retake_context_window_seconds", 30)
+            retake_min_confidence = input_data.get("retake_min_confidence", 0.7)
+            retake_prefer_sentence_boundaries = input_data.get("retake_prefer_sentence_boundaries", True)
+            llm_model = input_data.get("llm_model", "gpt-4")
 
             logger.info(f"Starting video processing pipeline for asset {asset_id}")
 
@@ -110,7 +117,7 @@ class VideoProcessHandler(BaseHandler):
                 after_cuts_duration_ms = after_vad_duration_ms
                 current_video_path = vad_output_path
 
-                if retake_markers and transcript_words:
+                if retake_detection_enabled and retake_markers and transcript_words:
                     logger.info(f"Step 3: Retake marker detection (markers: {retake_markers})")
                     
                     # Search for retake phrases
@@ -123,11 +130,16 @@ class VideoProcessHandler(BaseHandler):
                         openai_api_key = os.getenv("OPENAI_API_KEY")
                         
                         if openai_api_key:
-                            # Use LLM to analyze cuts
+                            # Use LLM to analyze cuts with enhanced settings
                             cut_instructions = analyze_retake_cuts(
                                 transcript_words=transcript_words,
                                 retake_matches=retake_matches,
-                                api_key=openai_api_key
+                                api_key=openai_api_key,
+                                context_window_seconds=retake_context_window,
+                                min_confidence=retake_min_confidence,
+                                prefer_sentence_boundaries=retake_prefer_sentence_boundaries,
+                                model=llm_model,
+                                vad_segments=vad_result.get("speech_segments")
                             )
                             
                             if cut_instructions:
@@ -265,7 +277,7 @@ class VideoProcessHandler(BaseHandler):
                             }
                         )
 
-                # Create and upload edit report
+                # Create and upload edit report with enhanced LLM info
                 edit_report = {
                     "original_duration_ms": original_duration_ms,
                     "after_silence_removal_ms": after_vad_duration_ms,
@@ -273,6 +285,25 @@ class VideoProcessHandler(BaseHandler):
                     "final_duration_ms": after_cuts_duration_ms,
                     "silence_removed_ms": silence_removed_ms,
                     "retake_cuts": retake_cuts,
+                    "retake_cuts_detailed": [
+                        {
+                            "start_time": cut["start_time"],
+                            "end_time": cut["end_time"],
+                            "duration_seconds": cut["end_time"] - cut["start_time"],
+                            "reason": cut["reason"],
+                            "confidence": cut.get("confidence"),
+                            "pattern": cut.get("pattern"),
+                            "method": cut.get("method"),
+                            "llm_reasoning": cut.get("llm_reasoning")
+                        }
+                        for cut in retake_cuts
+                    ] if retake_cuts else [],
+                    "retake_analysis_settings": {
+                        "llm_model": llm_model,
+                        "context_window_seconds": retake_context_window,
+                        "min_confidence": retake_min_confidence,
+                        "prefer_sentence_boundaries": retake_prefer_sentence_boundaries
+                    } if retake_cuts else None,
                     "intro_transition_applied": intro_applied,
                     "transcript_word_count": len(transcript_words),
                     "transcript_words_removed": transcription_result.get("word_count", 0) - len(transcript_words),

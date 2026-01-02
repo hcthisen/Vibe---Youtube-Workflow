@@ -215,21 +215,114 @@ Upload -> job -> worker -> outputs.
 
 Pipeline outputs:
 - Processed MP4
-- Transcript JSON (timestamps if available)
+- Transcript JSON (word-level timestamps)
+- Transcript TXT (plaintext)
 - Edit report JSON:
   - original duration, processed duration
   - total silence removed
-  - cut segments list
+  - retake cuts with LLM reasoning and confidence scores
+  - retake analysis settings used
+  - processing steps applied
 
 Core steps:
-1. Download raw video from Supabase Storage.
-2. Extract audio (ffmpeg).
-3. Detect speech segments with VAD and cut silences over threshold.
-4. Apply intro transition if enabled:
-   - use the included transition scripts as reference
-5. Export MP4.
-6. Transcribe processed audio/video (provider pluggable; for MVP pick one and implement).
-7. Upload outputs back to Storage and update DB rows.
+1. **Download** raw video from Supabase Storage
+2. **VAD Silence Removal**: Use Silero VAD to detect speech segments and remove silences
+   - Configurable threshold (default: 500ms)
+   - Preserves intro (first segment starts at 0:00)
+   - Adds padding around speech segments
+3. **Transcription**: Use OpenAI Whisper to generate word-level transcript
+   - Base model for accuracy/speed balance
+   - Word-level timestamps for precise cuts
+   - Both JSON and plaintext formats
+4. **LLM-Based Retake Detection** (if retake markers configured):
+   - Search transcript for user-configured phrases (e.g., "cut cut", "oops")
+   - Extract context windows (default: 30s) around each marker
+   - Send to GPT-4 with reasoning prompts
+   - LLM analyzes context and returns optimal cut points with confidence scores
+   - Handles variable-length mistakes (2 seconds to 30+ seconds)
+   - Pattern recognition: quick fix, full redo, multiple attempts
+   - Prefers sentence boundaries for natural cuts
+   - Fallback to enhanced heuristics if LLM fails
+   - Apply cuts via FFmpeg and update transcript
+5. **Intro Transition** (if enabled):
+   - Use Remotion-based 3D transition overlay
+   - Preserves audio, applies visual effect
+6. **Upload Outputs**:
+   - Processed video to `project-processed-videos` bucket
+   - Transcripts to `project-transcripts` bucket
+   - Edit report to `project-reports` bucket
+   - Create asset records in database
+
+**Retake Detection Configuration** (per user profile):
+- `retake_markers`: Array of trigger phrases (default: [])
+- `retake_context_window_seconds`: Context size for LLM (default: 30, range: 10-120)
+- `retake_min_confidence`: Minimum confidence score (default: 0.7, range: 0.0-1.0)
+- `retake_prefer_sentence_boundaries`: Use natural cut points (default: true)
+- `llm_model`: OpenAI model to use (default: "gpt-4", options: gpt-4, gpt-4-turbo, gpt-4o)
+
+**LLM Analysis Flow**:
+```
+Retake Marker Found → Extract Context → Detect Pattern → LLM Analysis
+                                                              ↓
+                                            Return {cuts, reasoning, confidence}
+                                                              ↓
+                                Filter by min_confidence ← Apply Cuts → Update Transcript
+                                         ↓ (if too low)
+                              Enhanced Fallback Heuristics
+```
+
+**Fallback Behavior**:
+If LLM analysis fails or returns low confidence:
+1. Try sentence boundaries (punctuation + pauses)
+2. Try VAD silence gaps
+3. Use speech density-based lookback
+4. Default to 10-second lookback
+
+**Edit Report Structure**:
+```json
+{
+  "original_duration_ms": 180000,
+  "after_silence_removal_ms": 150000,
+  "after_retake_cuts_ms": 140000,
+  "silence_removed_ms": 30000,
+  "retake_cuts_detailed": [
+    {
+      "start_time": 45.2,
+      "end_time": 52.8,
+      "reason": "Removed false start before 'cut cut'",
+      "confidence": 0.92,
+      "pattern": "full_redo",
+      "method": "llm",
+      "llm_reasoning": "Speaker restarted completely, natural boundary at 45.2s"
+    }
+  ],
+  "retake_analysis_settings": {
+    "llm_model": "gpt-4",
+    "context_window_seconds": 30,
+    "min_confidence": 0.7
+  },
+  "processing_steps": [
+    "vad_silence_removal",
+    "transcription",
+    "llm_retake_cuts",
+    "intro_transition"
+  ]
+}
+```
+
+**Implementation Notes**:
+- Worker: `workers/media/worker.py`
+- Handler: `workers/media/handlers/video_process.py`
+- LLM Logic: `workers/media/utils/llm_cuts.py`
+- Transcription: `workers/media/utils/transcription.py`
+- VAD Processing: `workers/media/utils/vad_processor.py`
+
+**Dependencies**:
+- FFmpeg (video processing)
+- OpenAI Whisper (transcription)
+- OpenAI API (GPT-4 for retake analysis)
+- Silero VAD (voice activity detection)
+- Remotion + Node.js (intro transitions, optional)
 
 ### 6.9 Thumbnail generation (Nano Banana Pro)
 Inputs:

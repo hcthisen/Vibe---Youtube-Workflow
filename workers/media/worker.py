@@ -75,64 +75,122 @@ class MediaWorker:
         logger.info("Shutdown signal received, finishing current job...")
         self.running = False
 
-    def _connect_db(self):
+    def _connect_db(self, force_reconnect=False):
         """Connect to PostgreSQL database."""
-        if self.conn is None or self.conn.closed:
+        if force_reconnect or self.conn is None or self.conn.closed:
+            # Close existing connection if any
+            if self.conn:
+                try:
+                    self.conn.close()
+                except:
+                    pass
+            
             self.conn = psycopg2.connect(Config.DATABASE_URL)
             self.conn.autocommit = False
             logger.info("Connected to database")
         return self.conn
+    
+    def _execute_with_retry(self, operation, *args, max_retries=3):
+        """Execute a database operation with automatic retry on connection errors."""
+        for attempt in range(max_retries):
+            try:
+                # Force reconnect on retry attempts
+                if attempt > 0:
+                    logger.info(f"Retry attempt {attempt + 1}/{max_retries}")
+                    self._connect_db(force_reconnect=True)
+                
+                return operation(*args)
+            
+            except (psycopg2.OperationalError, psycopg2.InterfaceError) as e:
+                logger.warning(f"Database connection error (attempt {attempt + 1}/{max_retries}): {e}")
+                
+                # Reset connection
+                if self.conn:
+                    try:
+                        self.conn.close()
+                    except:
+                        pass
+                    self.conn = None
+                
+                if attempt == max_retries - 1:
+                    # Last attempt failed, re-raise
+                    raise
+                
+                time.sleep(1)  # Brief pause before retry
 
     def _get_next_job(self):
         """Get the next queued job."""
-        conn = self._connect_db()
+        # Use fresh connection for each poll to avoid stale connections
+        conn = self._connect_db(force_reconnect=False)
         supported_types = list(self.handlers.keys())
         _debug_log("F", "workers/media/worker.py:_get_next_job", "Polling for next media job", {"supported_types": supported_types})
         
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            # Lock and fetch next queued job
-            cur.execute("""
-                UPDATE jobs
-                SET status = 'running', updated_at = NOW()
-                WHERE id = (
-                    SELECT id FROM jobs
-                    WHERE status = 'queued'
-                      AND type = ANY(%s)
-                    ORDER BY created_at ASC
-                    FOR UPDATE SKIP LOCKED
-                    LIMIT 1
-                )
-                RETURNING *
-            """, (supported_types,))
-            
-            job = cur.fetchone()
-            conn.commit()
-            _debug_log("F", "workers/media/worker.py:_get_next_job", "Fetched job", {"found": bool(job), "job_type": job.get("type") if job else None, "job_id": job.get("id") if job else None})
-            return dict(job) if job else None
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # Lock and fetch next queued job
+                cur.execute("""
+                    UPDATE jobs
+                    SET status = 'running', updated_at = NOW()
+                    WHERE id = (
+                        SELECT id FROM jobs
+                        WHERE status = 'queued'
+                          AND type = ANY(%s)
+                        ORDER BY created_at ASC
+                        FOR UPDATE SKIP LOCKED
+                        LIMIT 1
+                    )
+                    RETURNING *
+                """, (supported_types,))
+                
+                job = cur.fetchone()
+                conn.commit()
+                _debug_log("F", "workers/media/worker.py:_get_next_job", "Fetched job", {"found": bool(job), "job_type": job.get("type") if job else None, "job_id": job.get("id") if job else None})
+                return dict(job) if job else None
+        
+        except (psycopg2.OperationalError, psycopg2.InterfaceError) as e:
+            logger.warning(f"Connection error while fetching job: {e}")
+            # Reset connection and return None (will retry next poll)
+            if self.conn:
+                try:
+                    self.conn.close()
+                except:
+                    pass
+                self.conn = None
+            return None
 
     def _complete_job(self, job_id: str, output: dict):
         """Mark job as succeeded."""
-        conn = self._connect_db()
+        def _do_complete(job_id, output):
+            # Force fresh connection before updating job status (prevents timeout issues)
+            logger.info("Refreshing database connection before marking job complete")
+            conn = self._connect_db(force_reconnect=True)
+            
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE jobs
+                    SET status = 'succeeded', output = %s, updated_at = NOW()
+                    WHERE id = %s
+                """, (json.dumps(output), job_id))
+                conn.commit()
         
-        with conn.cursor() as cur:
-            cur.execute("""
-                UPDATE jobs
-                SET status = 'succeeded', output = %s, updated_at = NOW()
-                WHERE id = %s
-            """, (json.dumps(output), job_id))
-            conn.commit()
+        self._execute_with_retry(_do_complete, job_id, output)
 
     def _fail_job(self, job_id: str, error: str):
         """Mark job as failed."""
-        conn = self._connect_db()
+        def _do_fail(job_id, error):
+            # Force fresh connection before updating job status (prevents timeout issues)
+            logger.info("Refreshing database connection before marking job failed")
+            conn = self._connect_db(force_reconnect=True)
+            
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE jobs
+                    SET status = 'failed', error = %s, updated_at = NOW()
+                    WHERE id = %s
+                """, (error, job_id))
+                conn.commit()
         
-        with conn.cursor() as cur:
-            cur.execute("""
-                UPDATE jobs
-                SET status = 'failed', error = %s, updated_at = NOW()
-                WHERE id = %s
-            """, (error, job_id))
-            conn.commit()
+        self._execute_with_retry(_do_fail, job_id, error)
 
     def _process_job(self, job: dict):
         """Process a single job."""

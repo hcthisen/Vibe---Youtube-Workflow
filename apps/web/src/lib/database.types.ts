@@ -18,6 +18,11 @@ export interface Database {
           intro_transition_enabled: boolean;
           default_language_code: string | null;
           default_location_code: number | null;
+          retake_detection_enabled: boolean;
+          retake_context_window_seconds: number;
+          retake_min_confidence: number;
+          retake_prefer_sentence_boundaries: boolean;
+          llm_model: string;
           created_at: string;
           updated_at: string;
         };
@@ -29,6 +34,11 @@ export interface Database {
           intro_transition_enabled?: boolean;
           default_language_code?: string | null;
           default_location_code?: number | null;
+          retake_detection_enabled?: boolean;
+          retake_context_window_seconds?: number;
+          retake_min_confidence?: number;
+          retake_prefer_sentence_boundaries?: boolean;
+          llm_model?: string;
           created_at?: string;
           updated_at?: string;
         };
@@ -40,6 +50,11 @@ export interface Database {
           intro_transition_enabled?: boolean;
           default_language_code?: string | null;
           default_location_code?: number | null;
+          retake_detection_enabled?: boolean;
+          retake_context_window_seconds?: number;
+          retake_min_confidence?: number;
+          retake_prefer_sentence_boundaries?: boolean;
+          llm_model?: string;
           created_at?: string;
           updated_at?: string;
         };
