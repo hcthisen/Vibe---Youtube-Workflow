@@ -24,29 +24,41 @@ interface Asset {
   } | null;
 }
 
+interface PresetStyle {
+  id: string;
+  bucket: string;
+  path: string;
+  name: string;
+  created_at: string;
+}
+
 interface ThumbnailGalleryProps {
   projectId: string;
   userId: string;
   thumbnails: Asset[];
   ideaBriefMarkdown?: string;
+  presetStyles?: PresetStyle[];
 }
 
-export function ThumbnailGallery({ projectId, userId, thumbnails, ideaBriefMarkdown }: ThumbnailGalleryProps) {
+export function ThumbnailGallery({ projectId, userId, thumbnails, ideaBriefMarkdown, presetStyles = [] }: ThumbnailGalleryProps) {
   const router = useRouter();
   const [generating, setGenerating] = useState(false);
   const [iterating, setIterating] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   
   const [referenceUrl, setReferenceUrl] = useState("");
+  const [selectedPresetStyleId, setSelectedPresetStyleId] = useState<string | undefined>();
   const [textModifications, setTextModifications] = useState("");
   const [thumbnailCount, setThumbnailCount] = useState(2);
   const [selectedHeadshotId, setSelectedHeadshotId] = useState<string | undefined>();
   const [autoSelectedHeadshotId, setAutoSelectedHeadshotId] = useState<string | undefined>();
+  const [presetStyleUrls, setPresetStyleUrls] = useState<Record<string, string>>({});
   
   const [selectedThumbnail, setSelectedThumbnail] = useState<Asset | null>(null);
   const [iterateHeadshotId, setIterateHeadshotId] = useState<string | undefined>();
   const [iterateTextMods, setIterateTextMods] = useState("");
   const [refinementPrompt, setRefinementPrompt] = useState("");
+  const [iterateThumbnailCount, setIterateThumbnailCount] = useState(2);
   
   const [error, setError] = useState<string | null>(null);
   const [showGenerateForm, setShowGenerateForm] = useState(false);
@@ -61,6 +73,32 @@ export function ThumbnailGallery({ projectId, userId, thumbnails, ideaBriefMarkd
   const isProcessing = jobStatus === "queued" || jobStatus === "running";
 
   const supabase = createClient();
+
+  // Fetch preset style URLs on mount
+  useEffect(() => {
+    if (presetStyles.length > 0) {
+      const fetchPresetUrls = async () => {
+        const urls: Record<string, string> = {};
+        for (const preset of presetStyles) {
+          // For private buckets, use signed URLs (valid for 1 hour)
+          const { data, error } = await supabase.storage
+            .from(preset.bucket)
+            .createSignedUrl(preset.path, 3600); // 1 hour expiration
+          
+          if (error) {
+            console.error(`Failed to get URL for preset ${preset.id}:`, error);
+            // Fallback to public URL (won't work for private buckets, but won't crash)
+            const { data: publicData } = supabase.storage.from(preset.bucket).getPublicUrl(preset.path);
+            urls[preset.id] = publicData.publicUrl;
+          } else {
+            urls[preset.id] = data.signedUrl;
+          }
+        }
+        setPresetStyleUrls(urls);
+      };
+      fetchPresetUrls();
+    }
+  }, [presetStyles]);
 
   // Check for active thumbnail generation jobs on mount
   useEffect(() => {
@@ -80,15 +118,27 @@ export function ThumbnailGallery({ projectId, userId, thumbnails, ideaBriefMarkd
 
   const checkForActiveJobs = async () => {
     try {
-      const response = await fetch(`/api/jobs/active?type=thumbnail_generate`);
-      const data = await response.json();
-      if (data.jobs && data.jobs.length > 0) {
-        const activeJob = data.jobs[0];
-        // Check if job is for this project
-        if (activeJob.input?.project_id === projectId) {
+      // Check for both thumbnail_generate and thumbnail_iterate jobs
+      const [generateResponse, iterateResponse] = await Promise.all([
+        fetch(`/api/jobs/active?type=thumbnail_generate`),
+        fetch(`/api/jobs/active?type=thumbnail_iterate`),
+      ]);
+      
+      const generateData = await generateResponse.json();
+      const iterateData = await iterateResponse.json();
+      
+      const allJobs = [...(generateData.jobs || []), ...(iterateData.jobs || [])];
+      
+      if (allJobs.length > 0) {
+        const activeJob = allJobs.find((job: any) => job.input?.project_id === projectId);
+        if (activeJob) {
           setActiveJobId(activeJob.id);
           setJobStatus(activeJob.status);
-          setGenerating(true);
+          if (activeJob.type === "thumbnail_generate") {
+            setGenerating(true);
+          } else if (activeJob.type === "thumbnail_iterate") {
+            setIterating(true);
+          }
         }
       }
     } catch (err) {
@@ -110,6 +160,7 @@ export function ThumbnailGallery({ projectId, userId, thumbnails, ideaBriefMarkd
         setActiveJobId(null);
         setJobStatus(null);
         setGenerating(false);
+        setIterating(false);
         // Refresh the page to show new thumbnails
         router.refresh();
       } else if (data.job.status === "failed") {
@@ -117,6 +168,7 @@ export function ThumbnailGallery({ projectId, userId, thumbnails, ideaBriefMarkd
         setActiveJobId(null);
         setJobStatus(null);
         setGenerating(false);
+        setIterating(false);
       }
     } catch (err) {
       console.error("Failed to check job status:", err);
@@ -141,8 +193,9 @@ export function ThumbnailGallery({ projectId, userId, thumbnails, ideaBriefMarkd
   };
 
   const handleGenerate = async () => {
-    if (!referenceUrl.trim()) {
-      setError("Please enter a reference thumbnail URL");
+    // Either reference URL or preset style must be provided
+    if (!referenceUrl.trim() && !selectedPresetStyleId) {
+      setError("Please enter a reference thumbnail URL or select a preset style");
       return;
     }
 
@@ -150,12 +203,18 @@ export function ThumbnailGallery({ projectId, userId, thumbnails, ideaBriefMarkd
     setError(null);
 
     try {
+      // If preset style is selected, use its URL; otherwise use the entered URL
+      const referenceThumbnailUrl = selectedPresetStyleId 
+        ? presetStyleUrls[selectedPresetStyleId]
+        : referenceUrl.trim();
+
       const response = await fetch("/api/tools/thumbnail_generate_from_reference", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           project_id: projectId,
-          reference_thumbnail_url: referenceUrl.trim(),
+          reference_thumbnail_url: referenceThumbnailUrl,
+          preset_style_id: selectedPresetStyleId,
           headshot_id: selectedHeadshotId,
           text_modifications: textModifications?.trim() || undefined,
           idea_brief_markdown: ideaBriefMarkdown,
@@ -181,6 +240,7 @@ export function ThumbnailGallery({ projectId, userId, thumbnails, ideaBriefMarkd
       }
 
       setReferenceUrl("");
+      setSelectedPresetStyleId(undefined);
       setTextModifications("");
       setSelectedHeadshotId(undefined);
       setShowGenerateForm(false);
@@ -208,26 +268,32 @@ export function ThumbnailGallery({ projectId, userId, thumbnails, ideaBriefMarkd
           project_id: projectId,
           previous_thumbnail_asset_id: selectedThumbnail.id,
           headshot_id: iterateHeadshotId,
-          text_modifications: iterateTextMods || undefined,
-          refinement_prompt: refinementPrompt,
-          count: 3,
+          text_modifications: iterateTextMods?.trim() || undefined,
+          refinement_prompt: refinementPrompt.trim(),
+          idea_brief_markdown: ideaBriefMarkdown,
+          count: iterateThumbnailCount,
         }),
       });
 
       const result = await response.json();
 
       if (!result.success) {
-        throw new Error(result.error || "Failed to iterate");
+        throw new Error(result.error || "Failed to start thumbnail iteration");
+      }
+
+      // Store job ID for polling
+      if (result.data?.job_id) {
+        setActiveJobId(result.data.job_id);
+        setJobStatus(result.data.status || "queued");
       }
 
       setRefinementPrompt("");
       setIterateTextMods("");
       setIterateHeadshotId(undefined);
       setSelectedThumbnail(null);
-      router.refresh();
+      // Don't refresh yet - wait for job to complete
     } catch (err) {
       setError(err instanceof Error ? err.message : "Iteration failed");
-    } finally {
       setIterating(false);
     }
   };
@@ -306,6 +372,74 @@ export function ThumbnailGallery({ projectId, userId, thumbnails, ideaBriefMarkd
       {/* Generate Form */}
       {showGenerateForm && (
         <div className="space-y-3 p-4 bg-gray-800/50 rounded-lg border border-gray-700">
+          {/* Preset Styles Selection */}
+          {presetStyles.length > 0 && (
+            <div>
+              <label className="block text-sm text-gray-400 mb-2">
+                Or Select a Preset Style
+              </label>
+              <div className="grid grid-cols-2 gap-2 mb-2">
+                {presetStyles.map((preset) => {
+                  const presetUrl = presetStyleUrls[preset.id];
+                  const isSelected = selectedPresetStyleId === preset.id;
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedPresetStyleId(isSelected ? undefined : preset.id);
+                        if (!isSelected) {
+                          setReferenceUrl(""); // Clear URL when preset is selected
+                        }
+                      }}
+                      className={`relative aspect-video rounded-lg border-2 overflow-hidden transition-all ${
+                        isSelected
+                          ? "border-primary-500 ring-2 ring-primary-500/50"
+                          : "border-gray-700 hover:border-gray-600"
+                      }`}
+                      disabled={isProcessing}
+                    >
+                      {presetUrl ? (
+                        <Image
+                          src={presetUrl}
+                          alt={preset.name}
+                          fill
+                          className="object-cover"
+                          unoptimized
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gray-800 flex items-center justify-center text-gray-500 text-xs">
+                          Loading...
+                        </div>
+                      )}
+                      {isSelected && (
+                        <div className="absolute inset-0 bg-primary-500/20 flex items-center justify-center">
+                          <div className="bg-primary-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
+                            ✓
+                          </div>
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              {selectedPresetStyleId && (
+                <p className="text-xs text-gray-500">
+                  Using preset: {presetStyles.find((p) => p.id === selectedPresetStyleId)?.name}
+                </p>
+              )}
+            </div>
+          )}
+
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-700"></div>
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-gray-800/50 px-2 text-gray-500">Or</span>
+            </div>
+          </div>
+
           <div>
             <label className="block text-sm text-gray-400 mb-1">
               Reference Thumbnail URL
@@ -313,7 +447,12 @@ export function ThumbnailGallery({ projectId, userId, thumbnails, ideaBriefMarkd
             <input
               type="url"
               value={referenceUrl}
-              onChange={(e) => setReferenceUrl(e.target.value)}
+              onChange={(e) => {
+                setReferenceUrl(e.target.value);
+                if (e.target.value.trim()) {
+                  setSelectedPresetStyleId(undefined); // Clear preset when URL is entered
+                }
+              }}
               placeholder="YouTube video or thumbnail URL (e.g., https://youtube.com/watch?v=...)"
               className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:border-primary-500 focus:outline-none"
               disabled={isProcessing}
@@ -474,27 +613,27 @@ export function ThumbnailGallery({ projectId, userId, thumbnails, ideaBriefMarkd
                   </svg>
                 </button>
 
-                {/* Delete button */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDelete(thumbnail.id);
-                  }}
-                  disabled={deleting === thumbnail.id}
+              {/* Delete button */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDelete(thumbnail.id);
+                }}
+                disabled={deleting === thumbnail.id}
                   className="bg-red-500/80 hover:bg-red-600 disabled:bg-red-500/50 p-1.5 rounded text-white"
-                  title="Delete thumbnail"
-                >
-                  {deleting === thumbnail.id ? (
-                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                  ) : (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  )}
-                </button>
+                title="Delete thumbnail"
+              >
+                {deleting === thumbnail.id ? (
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                )}
+              </button>
               </div>
             </div>
           ))}
@@ -536,6 +675,7 @@ export function ThumbnailGallery({ projectId, userId, thumbnails, ideaBriefMarkd
               onChange={(e) => setIterateTextMods(e.target.value)}
               placeholder="e.g., Change text color to teal"
               className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:border-accent-500 focus:outline-none"
+              disabled={isProcessing}
             />
           </div>
 
@@ -549,15 +689,33 @@ export function ThumbnailGallery({ projectId, userId, thumbnails, ideaBriefMarkd
               placeholder="Make the face more expressive, add more contrast..."
               rows={3}
               className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:border-accent-500 focus:outline-none resize-none"
+              disabled={isProcessing}
             />
+          </div>
+
+          <div>
+            <label className="block text-sm text-gray-400 mb-1">
+              Number of Variations
+            </label>
+            <select
+              value={iterateThumbnailCount}
+              onChange={(e) => setIterateThumbnailCount(Number(e.target.value))}
+              className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm text-white focus:border-accent-500 focus:outline-none"
+              disabled={isProcessing}
+            >
+              <option value={1}>1 variation</option>
+              <option value={2}>2 variations</option>
+              <option value={3}>3 variations</option>
+              <option value={4}>4 variations</option>
+            </select>
           </div>
           
           <button
             onClick={handleIterate}
-            disabled={iterating}
+            disabled={isProcessing || iterating}
             className="w-full px-4 py-2 bg-accent-600 hover:bg-accent-700 disabled:bg-accent-600/50 text-white text-sm font-medium rounded-lg transition-colors"
           >
-            {iterating ? "Generating..." : "Generate 3 Variations"}
+            {isProcessing || iterating ? "Generating..." : `Generate ${iterateThumbnailCount} Variation${iterateThumbnailCount > 1 ? 's' : ''}`}
           </button>
         </div>
       )}

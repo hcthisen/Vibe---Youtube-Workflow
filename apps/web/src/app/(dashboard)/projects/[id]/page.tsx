@@ -73,6 +73,21 @@ export default async function ProjectPage({
 
   const jobs = (jobsData as unknown as JobRow[] | null) ?? [];
 
+  // Fetch user profile to get preset styles
+  const { data: profileData } = await supabase
+    .from("profiles")
+    .select("thumbnail_preset_styles")
+    .eq("id", user.id)
+    .single();
+  
+  const presetStyles = ((profileData as any)?.thumbnail_preset_styles || []) as Array<{
+    id: string;
+    bucket: string;
+    path: string;
+    name: string;
+    created_at: string;
+  }>;
+
   // Categorize assets
   const rawVideo = assets.find((a) => a.type === "raw_video");
   const processedVideo = assets.find((a) => a.type === "processed_video");
@@ -182,6 +197,7 @@ export default async function ProjectPage({
               userId={user.id}
               thumbnails={thumbnails}
               ideaBriefMarkdown={project.idea_brief_markdown || undefined}
+              presetStyles={presetStyles}
             />
           </section>
 

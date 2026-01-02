@@ -372,14 +372,14 @@ TASK: Replace the face in the thumbnail with ${userName}'s exact face from IMAGE
 
 ${params.refinementPrompt}
 
-${params.textModifications ? `Text changes: ${params.textModifications}` : 'Keep all text exactly as shown.'}`
+${params.textModifications ? `Text changes (follow exactly): ${params.textModifications}` : 'TEXT TASK: Replace the main headline text to match the Idea Brief (prefer any \"Thumbnail Text Ideas\" list inside it). Do NOT keep the existing headline unless it matches.'}`
       : `Refine this YouTube thumbnail based on the following instructions:
 
 ${params.refinementPrompt}
 
 Video title: "${params.title}"
 
-${params.textModifications ? `Text changes: ${params.textModifications}` : 'Keep all text exactly as shown.'}
+${params.textModifications ? `Text changes (follow exactly): ${params.textModifications}` : 'TEXT TASK: Replace the main headline text to match the Idea Brief (prefer any \"Thumbnail Text Ideas\" list inside it). Do NOT keep the existing headline unless it matches.'}
 
 Style: Professional YouTube thumbnail with bold, attention-grabbing elements.
 Format: 16:9 aspect ratio.
@@ -406,7 +406,7 @@ TASK: Replace ONLY the face in the thumbnail with ${userName}'s exact face from 
 
 Keep the composition, background, colors, and layout identical to IMAGE 2.
 
-${params.textModifications ? `Text changes: ${params.textModifications}` : 'Keep all text exactly as shown in IMAGE 2.'}
+${params.textModifications ? `Text changes (follow exactly): ${params.textModifications}` : 'TEXT TASK: Replace the main headline text to match the Idea Brief (prefer any \"Thumbnail Text Ideas\" list inside it). Do NOT keep the existing headline unless it matches.'}
 
 Video title context: "${params.title}"`;
 

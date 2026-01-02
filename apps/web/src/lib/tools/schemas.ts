@@ -234,9 +234,8 @@ export const thumbnailIterateInputSchema = z.object({
 });
 
 export const thumbnailIterateOutputSchema = z.object({
-  thumbnails: z.array(
-    z.object({
-      asset_id: z.string().uuid(),
+  job_id: z.string().uuid(),
+  status: z.string(),
       url: z.string(),
     })
   ),

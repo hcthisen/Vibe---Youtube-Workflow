@@ -30,7 +30,7 @@ export function VideoPlayer({ rawAsset, processedAsset, projectId, hasFailedJob 
   const [loading, setLoading] = useState(true);
   const [reprocessing, setReprocessing] = useState(false);
   const [reprocessError, setReprocessError] = useState<string | null>(null);
-  
+
   // Lazy loading state
   const [shouldLoadVideo, setShouldLoadVideo] = useState(false);
   const [previewGenerated, setPreviewGenerated] = useState(false);

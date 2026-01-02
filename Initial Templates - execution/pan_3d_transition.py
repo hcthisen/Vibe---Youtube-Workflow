@@ -316,21 +316,47 @@ def create_transition(
     easing: str = DEFAULT_EASING,
     bg_color: str = DEFAULT_BG_COLOR,
     bg_image: str = None,
+    sample_entire_video: bool = False,
 ) -> None:
-    """Create a 3D pan transition from a video segment."""
+    """Create a 3D pan transition from a video segment.
+    
+    Args:
+        input_path: Input video path
+        output_path: Output video path
+        start: Start time in seconds (ignored if sample_entire_video=True)
+        source_duration: Source duration in seconds (ignored if sample_entire_video=True)
+        output_duration: Duration of output transition in seconds
+        swivel_start: Starting Y-rotation in degrees
+        swivel_end: Ending Y-rotation in degrees
+        tilt_start: Starting X-rotation in degrees
+        tilt_end: Ending X-rotation in degrees
+        perspective: CSS perspective depth
+        playback_rate: Playback speed multiplier (ignored if sample_entire_video=True)
+        easing: Easing function (linear, easeOut, easeInOut, spring)
+        bg_color: Background color hex code
+        bg_image: Background image path (optional)
+        sample_entire_video: If True, samples frames evenly from entire video (0 to end)
+    """
 
     # Get video info
     info = get_video_info(input_path)
     print(f"📹 Input: {info['width']}x{info['height']} @ {info['fps']:.2f}fps")
+    
+    # Handle sample_entire_video mode
+    if sample_entire_video:
+        start = 0
+        source_duration = info["duration"]
+        playback_rate = source_duration / output_duration
+        print(f"📹 Sampling entire video: {source_duration:.1f}s at {playback_rate:.1f}x speed → {output_duration:.1f}s output")
+    else:
+        # Calculate source duration based on playback rate if not specified
+        if source_duration is None:
+            source_duration = output_duration * playback_rate
 
-    # Calculate source duration based on playback rate if not specified
-    if source_duration is None:
-        source_duration = output_duration * playback_rate
-
-    # Ensure we don't exceed video duration
-    if start + source_duration > info["duration"]:
-        source_duration = info["duration"] - start
-        print(f"⚠️  Adjusted source duration to {source_duration:.2f}s")
+        # Ensure we don't exceed video duration
+        if start + source_duration > info["duration"]:
+            source_duration = info["duration"] - start
+            print(f"⚠️  Adjusted source duration to {source_duration:.2f}s")
 
     with tempfile.TemporaryDirectory() as tmpdir:
         # Calculate extraction fps: we only need output_duration × output_fps frames

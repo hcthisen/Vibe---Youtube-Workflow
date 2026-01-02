@@ -18,6 +18,7 @@ from handlers.video_process import VideoProcessHandler
 from handlers.transcribe import TranscribeHandler
 from handlers.pose_analyze import PoseAnalyzeHandler
 from handlers.thumbnail_generate import ThumbnailGenerateHandler
+from handlers.thumbnail_iterate import ThumbnailIterateHandler
 
 # Configure logging
 logging.basicConfig(
@@ -66,6 +67,7 @@ class MediaWorker:
             "transcribe": TranscribeHandler(self.supabase, Config.TEMP_DIR),
             "pose_analyze": PoseAnalyzeHandler(self.supabase, Config.TEMP_DIR),
             "thumbnail_generate": ThumbnailGenerateHandler(self.supabase, Config.TEMP_DIR),
+            "thumbnail_iterate": ThumbnailIterateHandler(self.supabase, Config.TEMP_DIR),
         }
         
         # Setup signal handlers

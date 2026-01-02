@@ -4,13 +4,14 @@
 -- Drop existing constraint
 ALTER TABLE public.jobs DROP CONSTRAINT IF EXISTS jobs_type_check;
 
--- Add new constraint with thumbnail_generate included
+-- Add new constraint with thumbnail_generate and thumbnail_iterate included
 ALTER TABLE public.jobs
     ADD CONSTRAINT jobs_type_check 
     CHECK (type IN (
         'video_process', 
         'transcribe', 
-        'thumbnail_generate', 
+        'thumbnail_generate',
+        'thumbnail_iterate', 
         'pose_analyze', 
         'research_run',
         'outlier_search',

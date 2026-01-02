@@ -8,12 +8,49 @@ import json
 import base64
 import time
 import logging
+import re
 from typing import Dict, Any, List, Optional
 import requests
 from supabase import Client
 from .base import BaseHandler
 
 logger = logging.getLogger(__name__)
+
+def _extract_thumbnail_text_ideas(markdown: Optional[str]) -> List[str]:
+    """
+    Extract bullet items under a 'Thumbnail Text Ideas' heading from idea_brief_markdown.
+    Returns a list of short text ideas.
+    """
+    if not markdown:
+        return []
+
+    match = re.search(
+        r"Thumbnail Text Ideas\s*\n(?P<bullets>(?:\s*[-*]\s+.*\n)+)",
+        markdown,
+        re.IGNORECASE,
+    )
+    if not match:
+        return []
+
+    bullets = match.group("bullets")
+    ideas: List[str] = []
+    for line in bullets.splitlines():
+        line = line.strip()
+        if line.startswith("- ") or line.startswith("* "):
+            idea = line[2:].strip()
+            if idea:
+                ideas.append(idea)
+
+    # Deduplicate preserving order
+    seen = set()
+    deduped: List[str] = []
+    for idea in ideas:
+        key = idea.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(idea)
+    return deduped[:8]
 
 
 class ThumbnailGenerateHandler(BaseHandler):
@@ -256,7 +293,9 @@ class ThumbnailGenerateHandler(BaseHandler):
     ) -> str:
         """Build the prompt for face swap thumbnail generation"""
         user_name = user_name or "the person"
-        
+
+        text_ideas = _extract_thumbnail_text_ideas(idea_brief_markdown)
+
         prompt = f"""IMAGE 1: Reference photo of {user_name}'s face.
 IMAGE 2: The thumbnail to edit.
 
@@ -264,14 +303,30 @@ TASK: Replace ONLY the face in the thumbnail with {user_name}'s exact face from 
 
 Keep the composition, background, colors, and layout identical to IMAGE 2.
 
-{f'Text changes: {text_modifications}' if text_modifications else 'Keep all text exactly as shown in IMAGE 2.'}
-
 Video title context: "{title}"
 """
+
+        if text_modifications and text_modifications.strip():
+            prompt += f"\nText changes (follow exactly): {text_modifications.strip()}\n"
+        else:
+            if text_ideas:
+                ideas_block = "\n".join([f"- {t}" for t in text_ideas])
+                prompt += (
+                    "\nTEXT TASK: Replace the main headline text on the thumbnail.\n"
+                    "Choose ONE of the following candidate phrases (prefer short 2-5 words, BIG, high-contrast, ALL CAPS).\n"
+                    "Do NOT keep the existing headline text unless it already matches the idea.\n"
+                    f"{ideas_block}\n"
+                )
+            else:
+                prompt += (
+                    "\nTEXT TASK: Replace the main headline text on the thumbnail.\n"
+                    "Create a new short 2-5 word phrase that best matches the Idea Brief below.\n"
+                    "Do NOT keep the existing headline text unless it already matches the idea.\n"
+                )
         
         if idea_brief_markdown:
             prompt += f"""\n\nIdea Brief: {idea_brief_markdown}
-When adding or modifying text on the thumbnail, ensure it aligns with the core concepts and message from this idea brief.
+Use this brief to decide what headline text should be on the thumbnail (prefer the 'Thumbnail Text Ideas' list if present).
 """
         
         prompt += "\n\nOutput in 16:9 format."

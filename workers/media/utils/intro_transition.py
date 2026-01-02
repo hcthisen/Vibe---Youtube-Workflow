@@ -153,27 +153,11 @@ def add_intro_transition(
         except Exception as copy_error:
             return {"success": False, "error": str(copy_error)}
     
-    # Get video info to validate teaser_start
+    # Get video info
     try:
         video_info = get_video_info(input_path)
         video_duration = video_info["duration"]
-        
-        # Adjust teaser_start if it exceeds video duration
-        if teaser_start >= video_duration:
-            logger.warning(
-                f"teaser_start ({teaser_start}s) >= video duration ({video_duration:.1f}s), "
-                f"adjusting to start at {video_duration * 0.5:.1f}s"
-            )
-            teaser_start = video_duration * 0.5
-        
-        # Ensure we have enough content for the transition
-        available_content = video_duration - teaser_start
-        if available_content < 1.0:
-            logger.warning(
-                f"Not enough content after {teaser_start}s ({available_content:.1f}s available), "
-                f"adjusting teaser_start to {video_duration * 0.3:.1f}s"
-            )
-            teaser_start = video_duration * 0.3
+        logger.info(f"Video duration: {video_duration:.1f}s, will sample entire video for transition")
         
     except Exception as e:
         logger.error(f"Failed to get video info: {e}")
@@ -202,9 +186,10 @@ def add_intro_transition(
             create_transition(
                 input_path=input_path,
                 output_path=transition_path,
-                start=teaser_start,
+                start=0,  # Start from beginning
                 output_duration=duration,
-                bg_image=bg_image_path
+                bg_image=bg_image_path,
+                sample_entire_video=True  # Sample frames evenly from entire video
             )
         finally:
             if hasattr(signal, 'SIGALRM'):
@@ -212,6 +197,62 @@ def add_intro_transition(
                 signal.signal(signal.SIGALRM, old_handler)
         
         logger.info(f"3D transition generated: {transition_path}")
+        
+        # Verify transition duration and fix if needed
+        try:
+            actual_transition_info = get_video_info(transition_path)
+            actual_duration = actual_transition_info["duration"]
+            duration_diff = abs(actual_duration - duration)
+            
+            logger.info(f"Transition duration: expected={duration:.3f}s, actual={actual_duration:.3f}s, diff={duration_diff:.3f}s")
+            
+            # If duration mismatch > 0.1s, trim or pad to exact duration
+            if duration_diff > 0.1:
+                logger.warning(f"Duration mismatch detected ({duration_diff:.3f}s), correcting...")
+                
+                corrected_path = transition_path.replace(".mp4", "_corrected.mp4")
+                
+                if actual_duration > duration:
+                    # Trim to exact duration
+                    logger.info(f"Trimming transition to {duration}s")
+                    trim_cmd = [
+                        "ffmpeg", "-y",
+                        "-i", transition_path,
+                        "-t", str(duration),
+                        "-c:v", "copy",
+                        "-c:a", "copy",
+                        corrected_path
+                    ]
+                else:
+                    # Pad with last frame to exact duration
+                    logger.info(f"Padding transition to {duration}s")
+                    pad_duration = duration - actual_duration
+                    trim_cmd = [
+                        "ffmpeg", "-y",
+                        "-i", transition_path,
+                        "-vf", f"tpad=stop_mode=clone:stop_duration={pad_duration}",
+                        "-c:a", "copy",
+                        corrected_path
+                    ]
+                
+                subprocess.run(trim_cmd, capture_output=True, check=True, timeout=30)
+                
+                # Replace original with corrected
+                os.remove(transition_path)
+                os.rename(corrected_path, transition_path)
+                
+                # Verify correction
+                corrected_info = get_video_info(transition_path)
+                actual_duration = corrected_info["duration"]
+                logger.info(f"Corrected transition duration: {actual_duration:.3f}s")
+            
+            # Use actual duration for overlay (will be used later)
+            transition_actual_duration = actual_duration
+            
+        except Exception as e:
+            logger.warning(f"Failed to verify/correct transition duration: {e}")
+            # Use expected duration as fallback
+            transition_actual_duration = duration
         
     except TimeoutError as e:
         logger.error(f"Transition generation timed out: {e}")
@@ -260,8 +301,9 @@ def add_intro_transition(
     try:
         logger.info(f"Overlaying transition on video at {insert_at}s")
         
-        # Calculate overlay end time
-        overlay_end = insert_at + duration
+        # Calculate overlay end time using actual transition duration
+        overlay_end = insert_at + transition_actual_duration
+        logger.info(f"Overlay duration: {transition_actual_duration:.3f}s (from {insert_at}s to {overlay_end:.3f}s)")
         
         # Try to get hardware encoder args (from vad_processor if available)
         encoder_args = []
@@ -311,7 +353,8 @@ def add_intro_transition(
             "transition_applied": True,
             "overlay_start": insert_at,
             "overlay_end": overlay_end,
-            "teaser_start": teaser_start
+            "transition_duration": transition_actual_duration,
+            "sampled_entire_video": True
         }
         
     except Exception as e:

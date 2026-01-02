@@ -305,8 +305,8 @@ export async function thumbnailGenerateFromReferenceHandler(
     // Step 2: Create job for async processing
     const { data: job, error: jobError } = await supabase
       .from("jobs")
-      .insert({
-        user_id: context.userId,
+        .insert({
+          user_id: context.userId,
         project_id: input.project_id,
         type: "thumbnail_generate",
         status: "queued",
@@ -316,7 +316,7 @@ export async function thumbnailGenerateFromReferenceHandler(
           headshot_id: selectedHeadshotId,
           preset_style_id: input.preset_style_id,
           text_modifications: input.text_modifications,
-          prompt_additions: input.prompt_additions,
+            prompt_additions: input.prompt_additions,
           idea_brief_markdown: input.idea_brief_markdown,
           count: input.count || 2,
         },
@@ -356,14 +356,26 @@ export async function thumbnailIterateHandler(
   const logs: string[] = [];
 
   try {
-    logs.push(`Iterating on thumbnail: ${input.previous_thumbnail_asset_id}`);
+    logs.push(`Creating thumbnail iteration job for project: ${input.project_id}`);
 
     const supabase = await createServiceClient();
 
-    // Get previous thumbnail
+    // Verify project exists and belongs to user
+    const { data: project, error: projectError } = await supabase
+      .from("projects")
+      .select("id, title")
+      .eq("id", input.project_id)
+      .eq("user_id", context.userId)
+      .single();
+
+    if (projectError || !project) {
+      return { success: false, error: "Project not found", logs };
+    }
+
+    // Verify previous thumbnail exists and belongs to user
     const { data: prevAsset, error: assetError } = await supabase
       .from("project_assets")
-      .select("bucket, path, metadata")
+      .select("id, bucket, path, metadata")
       .eq("id", input.previous_thumbnail_asset_id)
       .eq("user_id", context.userId)
       .single();
@@ -372,147 +384,55 @@ export async function thumbnailIterateHandler(
       return { success: false, error: "Previous thumbnail not found", logs };
     }
 
-    // Get the previous thumbnail URL
-    const { data: urlData } = supabase.storage
-      .from(prevAsset.bucket)
-      .getPublicUrl(prevAsset.path);
-
-    const previousUrl = urlData.publicUrl;
-
-    // Get project
-    const { data: project } = await supabase
-      .from("projects")
-      .select("title")
-      .eq("id", input.project_id)
-      .eq("user_id", context.userId)
-      .single();
-
-    // Get user profile for name
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("display_name")
-      .eq("id", context.userId)
-      .single();
-
-    const userName = profile?.display_name || undefined;
-
-    // Determine which headshot to use (if swapping)
-    let headshotUrl: string | undefined;
-    let selectedHeadshot: { id: string; pose_yaw: number | null; pose_pitch: number | null; pose_bucket: string | null } | null = null;
-
+    // Verify headshot if provided
     if (input.headshot_id) {
-      // Swap to a different headshot
       const { data: headshot } = await supabase
         .from("headshots")
-        .select("id, bucket, path, pose_yaw, pose_pitch, pose_bucket")
+        .select("id")
         .eq("id", input.headshot_id)
         .eq("user_id", context.userId)
         .single();
 
-      if (headshot) {
-        const { data: headshotUrlData, error: urlError } = await supabase.storage
-          .from(headshot.bucket)
-          .createSignedUrl(headshot.path, 3600); // Valid for 1 hour
-        
-        if (!urlError && headshotUrlData?.signedUrl) {
-          headshotUrl = headshotUrlData.signedUrl;
-          selectedHeadshot = headshot;
-          logs.push(`Swapping to headshot: ${headshot.id}`);
-        } else {
-          logs.push(`Failed to generate signed URL for headshot: ${headshot.id}`);
-        }
+      if (!headshot) {
+        return { success: false, error: "Selected headshot not found", logs };
       }
+      logs.push(`Using manually selected headshot: ${input.headshot_id}`);
     } else {
-      // Keep the same headshot from previous generation
-      const metadata = prevAsset.metadata as Record<string, any> | null;
-      if (metadata?.headshot_id) {
-        selectedHeadshot = {
-          id: metadata.headshot_id,
-          pose_yaw: metadata.headshot_pose?.yaw || null,
-          pose_pitch: metadata.headshot_pose?.pitch || null,
-          pose_bucket: metadata.headshot_pose?.bucket || null,
-        };
-        logs.push(`Using same headshot as previous: ${metadata.headshot_id}`);
-      }
+      logs.push("Will use headshot from previous thumbnail metadata");
     }
 
-    // Generate iterated thumbnails
-    const result = await getNanoBananaClient().iterateThumbnail({
-      previousImageUrl: previousUrl,
-      headshotUrl,
-      userName,
-      refinementPrompt: input.refinement_prompt,
-      textModifications: input.text_modifications,
-      title: project?.title || "",
-      count: input.count || 3,
-    });
-
-    if (!result.success) {
-      return { success: false, error: result.error, logs };
-    }
-
-    // Store generated thumbnails
-    const thumbnails: { asset_id: string; url: string }[] = [];
-
-    for (let i = 0; i < result.images.length; i++) {
-      const imageData = result.images[i];
-      const path = `${context.userId}/${input.project_id}/thumbnail_iter_${Date.now()}_${i}.png`;
-
-      // Upload to storage
-      const { error: uploadError } = await supabase.storage
-        .from("project-thumbnails")
-        .upload(path, Buffer.from(imageData, "base64"), {
-          contentType: "image/png",
-        });
-
-      if (uploadError) {
-        logs.push(`Failed to upload thumbnail ${i}: ${uploadError.message}`);
-        continue;
-      }
-
-      // Create asset record with metadata
-      const { data: asset } = await supabase
-        .from("project_assets")
-        .insert({
-          user_id: context.userId,
+    // Create job for async processing
+    const { data: job, error: jobError } = await supabase
+      .from("jobs")
+      .insert({
+        user_id: context.userId,
+        project_id: input.project_id,
+        type: "thumbnail_iterate",
+        status: "queued",
+        input: {
           project_id: input.project_id,
-          type: "thumbnail",
-          bucket: "project-thumbnails",
-          path,
-          metadata: {
-            previous_asset_id: input.previous_thumbnail_asset_id,
-            headshot_id: selectedHeadshot?.id,
-            headshot_pose: selectedHeadshot ? {
-              yaw: selectedHeadshot.pose_yaw,
-              pitch: selectedHeadshot.pose_pitch,
-              bucket: selectedHeadshot.pose_bucket,
-            } : null,
-            refinement_prompt: input.refinement_prompt,
-            text_modifications: input.text_modifications,
-            generated_at: new Date().toISOString(),
-          },
-        })
-        .select("id")
-        .single();
+          previous_thumbnail_asset_id: input.previous_thumbnail_asset_id,
+          headshot_id: input.headshot_id,
+          text_modifications: input.text_modifications,
+          refinement_prompt: input.refinement_prompt,
+          idea_brief_markdown: input.idea_brief_markdown,
+          count: input.count || 2,
+        },
+      })
+      .select("id, status")
+      .single();
 
-      if (asset) {
-        const { data: urlData } = supabase.storage
-          .from("project-thumbnails")
-          .getPublicUrl(path);
-
-        thumbnails.push({
-          asset_id: asset.id,
-          url: urlData.publicUrl,
-        });
-      }
+    if (jobError || !job) {
+      return { success: false, error: jobError?.message || "Failed to create job", logs };
     }
 
-    logs.push(`Generated ${thumbnails.length} iterated thumbnails`);
+    logs.push(`Created thumbnail iteration job: ${job.id}`);
 
     return {
       success: true,
       data: {
-        thumbnails,
+        job_id: job.id,
+        status: job.status,
       },
       logs,
     };
