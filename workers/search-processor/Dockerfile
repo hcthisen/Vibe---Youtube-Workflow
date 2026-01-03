@@ -12,6 +12,7 @@ COPY workers/search-processor /app/workers/search-processor/
 
 # Copy the tool registry + handlers the worker imports at runtime
 COPY apps/web/src/lib /app/apps/web/src/lib/
+COPY apps/web/tsconfig.json /app/apps/web/tsconfig.json
 
 ENV NODE_ENV=production
 
