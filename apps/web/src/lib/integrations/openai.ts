@@ -33,21 +33,9 @@ interface GenerateOutlineParams {
   existingHooks: string[];
 }
 
-interface OutlineSection {
-  title: string;
-  beats: string[];
-  duration_estimate_seconds?: number;
-}
-
-interface OutlineResult {
-  intro: OutlineSection;
-  sections: OutlineSection[];
-  outro: OutlineSection;
-}
-
 interface GenerateOutlineResult {
   success: boolean;
-  outline: OutlineResult;
+  outline: { markdown: string };
   error?: string;
 }
 
@@ -255,26 +243,33 @@ Respond with a JSON object: { "ideas": [...] }`;
 
   async generateOutline(params: GenerateOutlineParams): Promise<GenerateOutlineResult> {
     try {
-      const systemPrompt = `You are a YouTube scriptwriter. Generate a detailed video outline.
+      const systemPrompt = `You are a YouTube scriptwriter. Generate a High Level video outline.
 You must respond with valid JSON only.`;
 
       const userPrompt = `Create a video outline for: "${params.title}"
 
-Context: ${params.context}
+Context:
+${params.context}
 
 ${params.existingHooks.length > 0 ? `Existing hook ideas to consider: ${params.existingHooks.join(", ")}` : ""}
 
-The outline should include:
-- intro: Opening hook and setup (30-60 seconds)
-- sections: 3-5 main content sections with beats
-- outro: Conclusion and call-to-action
+The outline should follow this exact format:
+2-3 Different opening hooks
+Bullet pointed list of things to cover
 
-For each section provide:
-- title: Section name
-- beats: Array of key points to cover
-- duration_estimate_seconds: Estimated duration
+Example Format:
+# Hooks
+Hook Option 1: [Hook text]
+Hook Option 2: [Hook text]
+Hook Option 3: [Hook text]
 
-Respond with JSON: { "intro": {...}, "sections": [...], "outro": {...} }`;
+# Outline
+- [Point 1]
+- [Point 2]
+- [Point 3]
+...
+
+Respond with JSON: { "markdown": "your markdown string here" }`;
 
       const response = await this.chat(
         [
@@ -284,16 +279,16 @@ Respond with JSON: { "intro": {...}, "sections": [...], "outro": {...} }`;
         { temperature: 0.7 }
       );
 
-      const parsed = this.parseJsonResponse<OutlineResult>(response);
+      const parsed = this.parseJsonResponse<{ markdown: string }>(response);
 
       return {
         success: true,
-        outline: parsed,
+        outline: { markdown: parsed.markdown || "" },
       };
     } catch (error) {
       return {
         success: false,
-        outline: { intro: { title: "", beats: [] }, sections: [], outro: { title: "", beats: [] } },
+        outline: { markdown: "" },
         error: error instanceof Error ? error.message : "Unknown error",
       };
     }

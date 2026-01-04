@@ -1,23 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactElement } from "react";
 import { useRouter } from "next/navigation";
-
-interface OutlineSection {
-  title: string;
-  beats: string[];
-  duration_estimate_seconds?: number;
-}
-
-interface Outline {
-  intro: OutlineSection;
-  sections: OutlineSection[];
-  outro: OutlineSection;
-}
 
 interface OutlineEditorProps {
   projectId: string;
-  outline: Record<string, unknown> | null;
+  outline: Record<string, any> | null;
   titleVariants: Array<{ title: string; style: string; reasoning?: string }> | null;
 }
 
@@ -26,9 +14,15 @@ export function OutlineEditor({ projectId, outline, titleVariants }: OutlineEdit
   const [generating, setGenerating] = useState(false);
   const [generatingTitles, setGeneratingTitles] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [expandedSection, setExpandedSection] = useState<string | null>(null);
 
-  const typedOutline = outline as Outline | null;
+  // Outline state
+  const initialContent = outline?.markdown || (
+    // Fallback for legacy structured outlines
+    outline?.sections ? JSON.stringify(outline, null, 2) : ""
+  );
+  const [isEditing, setIsEditing] = useState(false);
+  const [content, setContent] = useState(initialContent);
+  const [saving, setSaving] = useState(false);
 
   const handleGenerateOutline = async () => {
     setGenerating(true);
@@ -45,6 +39,11 @@ export function OutlineEditor({ projectId, outline, titleVariants }: OutlineEdit
 
       if (!result.success) {
         throw new Error(result.error || "Failed to generate outline");
+      }
+
+      // Update local content with the generated markdown
+      if (result.data?.outline?.markdown) {
+        setContent(result.data.outline.markdown);
       }
 
       router.refresh();
@@ -80,99 +79,101 @@ export function OutlineEditor({ projectId, outline, titleVariants }: OutlineEdit
     }
   };
 
-  if (!typedOutline) {
-    return (
-      <div className="text-center py-8">
-        <h2 className="text-lg font-semibold text-white mb-2">Outline</h2>
-        <p className="text-gray-400 mb-4">
-          Generate an AI-powered outline for your video
-        </p>
-        {error && (
-          <p className="text-red-400 text-sm mb-4">{error}</p>
-        )}
-        <button
-          onClick={handleGenerateOutline}
-          disabled={generating}
-          className="px-6 py-3 bg-primary-600 hover:bg-primary-700 disabled:bg-primary-600/50 text-white font-semibold rounded-lg transition-colors"
-        >
-          {generating ? "Generating..." : "Generate Outline"}
-        </button>
-      </div>
-    );
-  }
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
 
-  const formatDuration = (seconds?: number) => {
-    if (!seconds) return null;
-    const minutes = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `~${minutes}:${secs.toString().padStart(2, "0")}`;
+    try {
+      const response = await fetch(`/api/projects/${projectId}/outline`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          outline: { markdown: content },
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to save outline");
+      }
+
+      setIsEditing(false);
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const renderSection = (section: OutlineSection, key: string, label: string) => {
-    const isExpanded = expandedSection === key;
-
-    return (
-      <div key={key} className="border border-gray-700 rounded-lg overflow-hidden">
-        <button
-          onClick={() => setExpandedSection(isExpanded ? null : key)}
-          className="w-full flex items-center justify-between p-4 bg-gray-800/50 hover:bg-gray-800 transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-medium text-gray-500 uppercase">{label}</span>
-            <span className="text-white font-medium">{section.title}</span>
-          </div>
-          <div className="flex items-center gap-3">
-            {section.duration_estimate_seconds && (
-              <span className="text-sm text-gray-400">
-                {formatDuration(section.duration_estimate_seconds)}
-              </span>
-            )}
-            <svg
-              className={`w-5 h-5 text-gray-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </div>
-        </button>
-
-        {isExpanded && (
-          <div className="p-4 space-y-2">
-            {section.beats.map((beat, i) => (
-              <div key={i} className="flex items-start gap-3">
-                <span className="text-primary-400 font-mono text-sm">{i + 1}.</span>
-                <span className="text-gray-300">{beat}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    );
+  const handleCancel = () => {
+    setContent(initialContent);
+    setIsEditing(false);
+    setError(null);
   };
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-white">Outline</h2>
-        <button
-          onClick={handleGenerateOutline}
-          disabled={generating}
-          className="px-3 py-1 text-sm text-gray-400 hover:text-white transition-colors"
-        >
-          {generating ? "Regenerating..." : "Regenerate"}
-        </button>
+        <div className="flex gap-2">
+          {!isEditing && content && (
+            <button
+              onClick={() => setIsEditing(true)}
+              className="px-3 py-1 text-sm text-gray-400 hover:text-white transition-colors border border-transparent hover:border-gray-600 rounded"
+            >
+              Edit
+            </button>
+          )}
+          <button
+            onClick={handleGenerateOutline}
+            disabled={generating}
+            className="px-3 py-1 text-sm text-gray-400 hover:text-white transition-colors"
+          >
+            {generating ? "Generating..." : content ? "Regenerate" : "Generate Outline"}
+          </button>
+        </div>
       </div>
 
       {error && <p className="text-red-400 text-sm">{error}</p>}
 
-      <div className="space-y-2">
-        {renderSection(typedOutline.intro, "intro", "Intro")}
-        {typedOutline.sections.map((section, i) =>
-          renderSection(section, `section-${i}`, `Section ${i + 1}`)
+      {/* Editor / Viewer Area */}
+      <div className="bg-gray-800/30 border border-gray-700 rounded-xl p-6">
+        {isEditing ? (
+          <div className="space-y-4">
+            <textarea
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              className="w-full h-96 px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors font-mono text-sm"
+              placeholder="Enter outline markdown..."
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={handleCancel}
+                disabled={saving}
+                className="px-4 py-2 text-sm font-medium text-gray-300 hover:text-white border border-gray-600 hover:border-gray-500 rounded-lg transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors disabled:opacity-50"
+              >
+                {saving ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="prose prose-invert prose-gray max-w-none">
+            {content ? (
+              <MarkdownViewer content={content} />
+            ) : (
+              <div className="text-gray-500 italic py-8 text-center">
+                No outline generated yet. Click "Generate Outline" to start.
+              </div>
+            )}
+          </div>
         )}
-        {renderSection(typedOutline.outro, "outro", "Outro")}
       </div>
 
       {/* Title Variants */}
@@ -206,5 +207,139 @@ export function OutlineEditor({ projectId, outline, titleVariants }: OutlineEdit
       </div>
     </div>
   );
+}
+
+function MarkdownViewer({ content }: { content: string }) {
+  // Simple markdown parsing (duplicated from IdeaBrief to avoid dependency issues)
+  const lines = content.split("\n");
+  const elements: ReactElement[] = [];
+  let currentList: string[] = [];
+  let listType: "ul" | "ol" | null = null;
+
+  const flushList = (index: number) => {
+    if (currentList.length > 0) {
+      const ListTag = listType === "ol" ? "ol" : "ul";
+      elements.push(
+        <ListTag key={`list-${index}`} className="list-disc list-inside space-y-1 text-gray-300">
+          {currentList.map((item, i) => (
+            <li key={i}>{item}</li>
+          ))}
+        </ListTag>
+      );
+      currentList = [];
+      listType = null;
+    }
+  };
+
+  lines.forEach((line, index) => {
+    const trimmed = line.trim();
+
+    // Headers
+    if (trimmed.startsWith("# ")) {
+      flushList(index);
+      elements.push(
+        <h1 key={index} className="text-2xl font-bold text-white mt-6 mb-3">
+          {trimmed.slice(2)}
+        </h1>
+      );
+    } else if (trimmed.startsWith("## ")) {
+      flushList(index);
+      elements.push(
+        <h2 key={index} className="text-xl font-semibold text-white mt-5 mb-2">
+          {trimmed.slice(3)}
+        </h2>
+      );
+    } else if (trimmed.startsWith("### ")) {
+      flushList(index);
+      elements.push(
+        <h3 key={index} className="text-lg font-medium text-white mt-4 mb-2">
+          {trimmed.slice(4)}
+        </h3>
+      );
+    }
+    // Unordered list
+    else if (trimmed.startsWith("- ")) {
+      if (listType !== "ul") {
+        flushList(index);
+        listType = "ul";
+      }
+      currentList.push(trimmed.slice(2));
+    }
+    // Ordered list
+    else if (/^\d+\.\s/.test(trimmed)) {
+      if (listType !== "ol") {
+        flushList(index);
+        listType = "ol";
+      }
+      currentList.push(trimmed.replace(/^\d+\.\s/, ""));
+    }
+    // Bold text
+    else if (trimmed.includes("**")) {
+      flushList(index);
+      const parts = trimmed.split("**");
+      const formatted = parts.map((part, i) =>
+        i % 2 === 1 ? (
+          <strong key={i} className="font-bold text-white">
+            {part}
+          </strong>
+        ) : (
+          part
+        )
+      );
+      elements.push(
+        <p key={index} className="text-gray-300 mb-2">
+          {formatted}
+        </p>
+      );
+    }
+    // Links
+    else if (trimmed.includes("http")) {
+      flushList(index);
+      const urlMatch = trimmed.match(/(https?:\/\/[^\s]+)/);
+      if (urlMatch) {
+        const url = urlMatch[1];
+        const beforeUrl = trimmed.substring(0, trimmed.indexOf(url));
+        const afterUrl = trimmed.substring(trimmed.indexOf(url) + url.length);
+        elements.push(
+          <p key={index} className="text-gray-300 mb-2">
+            {beforeUrl}
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary-400 hover:text-primary-300 underline"
+            >
+              {url}
+            </a>
+            {afterUrl}
+          </p>
+        );
+      } else {
+        elements.push(
+          <p key={index} className="text-gray-300 mb-2">
+            {trimmed}
+          </p>
+        );
+      }
+    }
+    // Regular paragraph
+    else if (trimmed) {
+      flushList(index);
+      elements.push(
+        <p key={index} className="text-gray-300 mb-2">
+          {trimmed}
+        </p>
+      );
+    }
+    // Empty line
+    else {
+      flushList(index);
+    }
+  });
+
+  // Flush any remaining list
+  flushList(lines.length);
+
+  return <div className="space-y-2">{elements}</div>;
 }
 

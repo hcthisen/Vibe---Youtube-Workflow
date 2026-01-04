@@ -108,23 +108,7 @@ export const projectGenerateOutlineInputSchema = z.object({
 
 export const projectGenerateOutlineOutputSchema = z.object({
   outline: z.object({
-    intro: z.object({
-      title: z.string(),
-      beats: z.array(z.string()),
-      duration_estimate_seconds: z.number().optional(),
-    }),
-    sections: z.array(
-      z.object({
-        title: z.string(),
-        beats: z.array(z.string()),
-        duration_estimate_seconds: z.number().optional(),
-      })
-    ),
-    outro: z.object({
-      title: z.string(),
-      beats: z.array(z.string()),
-      duration_estimate_seconds: z.number().optional(),
-    }),
+    markdown: z.string(),
   }),
 });
 
