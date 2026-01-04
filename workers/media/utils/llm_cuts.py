@@ -33,6 +33,13 @@ DEFAULT_CONTEXT_WINDOW_SECONDS = 30
 DEFAULT_MIN_CONFIDENCE = 0.7
 DEFAULT_MAX_RETRIES = 3
 DEFAULT_RETRY_DELAY = 2.0
+PATTERN_MIN_LOOKBACK_SECONDS = {
+    "quick_fix": 0.5,
+    "medium_segment": 1.5,
+    "full_redo": 5.0,
+    "multiple_attempts": 2.0,
+    "unknown": 0.5,
+}
 
 MODEL_ALIASES = {
     "gpt-4": "gpt-4.1",
@@ -331,7 +338,8 @@ Return a JSON object analyzing ALL markers:
       "start_time": <float>,
       "end_time": <float>,
       "reason": "<description>",
-      "related_markers": [<list of marker timestamps this cut relates to>]
+      "related_markers": [<list of marker timestamps this cut relates to>],
+      "kind": "mistake" | "retake_phrase"
     }},
     ...
   ],
@@ -340,8 +348,8 @@ Return a JSON object analyzing ALL markers:
 }}
 
 Include cuts for:
-1. Mistake segments before each retake phrase
-2. The retake phrases themselves
+1. Mistake segments before each retake phrase (do not skip this)
+2. The retake phrases themselves (exact marker span)
 3. If multiple retakes are at same spot, remove all failed attempts, keep final success
 """
     
@@ -350,6 +358,7 @@ Include cuts for:
         all_cuts = _call_llm_with_retry_single(
             client, model, prompt, retake_matches, patterns, max_retries=DEFAULT_MAX_RETRIES
         )
+        used_fallback = False
         
         # Filter by confidence if needed
         if min_confidence > 0:
@@ -371,6 +380,17 @@ Include cuts for:
         all_cuts = generate_fallback_cuts(
             transcript_words, 
             retake_matches,
+            vad_segments=vad_segments,
+            sentence_boundaries=sentence_boundaries if prefer_sentence_boundaries else None
+        )
+        used_fallback = True
+    
+    if not used_fallback:
+        all_cuts = ensure_retake_coverage(
+            all_cuts,
+            transcript_words,
+            retake_matches,
+            patterns,
             vad_segments=vad_segments,
             sentence_boundaries=sentence_boundaries if prefer_sentence_boundaries else None
         )
@@ -471,6 +491,8 @@ def _call_llm_with_retry_single(
                     "method": "llm",
                     "llm_reasoning": reasoning
                 }
+                if "kind" in cut:
+                    enhanced_cut["cut_kind"] = cut["kind"]
                 enhanced_cuts.append(enhanced_cut)
             
             return enhanced_cuts
@@ -490,6 +512,88 @@ def _call_llm_with_retry_single(
     
     # All retries failed
     raise Exception(f"LLM call failed after {max_retries} attempts: {last_error}")
+
+
+def _cut_overlaps_range(cut: Dict, start_time: float, end_time: float) -> bool:
+    return cut["start_time"] <= end_time and cut["end_time"] >= start_time
+
+
+def _has_phrase_cut(cuts: List[Dict], match: Dict) -> bool:
+    for cut in cuts:
+        if cut.get("cut_kind") == "retake_phrase":
+            return True
+        if _cut_overlaps_range(cut, match["start"], match["end"]):
+            return True
+    return False
+
+
+def _has_mistake_cut(cuts: List[Dict], match: Dict, min_lookback: float) -> bool:
+    retake_start = match["start"]
+    retake_end = match["end"]
+    for cut in cuts:
+        if cut.get("cut_kind") == "mistake":
+            return True
+        if cut["start_time"] <= retake_start - min_lookback:
+            if _cut_overlaps_range(cut, retake_start, retake_end):
+                return True
+            if cut["end_time"] >= retake_start - 0.2:
+                return True
+    return False
+
+
+def ensure_retake_coverage(
+    cuts: List[Dict],
+    transcript_words: List[Dict],
+    retake_matches: List[Dict],
+    patterns: List[str],
+    vad_segments: Optional[List[Tuple[float, float]]] = None,
+    sentence_boundaries: Optional[List[int]] = None
+) -> List[Dict]:
+    """
+    Ensure each retake marker removes both the mistake segment and the retake phrase.
+    """
+    if not retake_matches:
+        return cuts
+
+    updated_cuts = list(cuts)
+
+    for idx, match in enumerate(retake_matches):
+        pattern = patterns[idx] if idx < len(patterns) else "unknown"
+        min_lookback = PATTERN_MIN_LOOKBACK_SECONDS.get(pattern, 0.5)
+
+        has_mistake = _has_mistake_cut(updated_cuts, match, min_lookback)
+        has_phrase = _has_phrase_cut(updated_cuts, match)
+
+        if has_mistake and has_phrase:
+            continue
+
+        logger.warning(
+            "  LLM cuts missing %s for marker at %.2fs (pattern=%s); adding fallback",
+            "mistake+phrase" if not has_mistake and not has_phrase else (
+                "mistake segment" if not has_mistake else "retake phrase"
+            ),
+            match["start"],
+            pattern
+        )
+
+        fallback_cuts = generate_fallback_cuts(
+            transcript_words,
+            [match],
+            vad_segments=vad_segments,
+            sentence_boundaries=sentence_boundaries
+        )
+
+        for fallback_cut in fallback_cuts:
+            if fallback_cut["pattern"] == "retake_phrase":
+                if not has_phrase and not _has_phrase_cut(updated_cuts, match):
+                    updated_cuts.append(fallback_cut)
+                    has_phrase = True
+            else:
+                if not has_mistake and not _has_mistake_cut(updated_cuts, match, min_lookback):
+                    updated_cuts.append(fallback_cut)
+                    has_mistake = True
+
+    return updated_cuts
 
 
 def merge_overlapping_cuts(cuts: List[Dict]) -> List[Dict]:
