@@ -1,8 +1,3 @@
-"""
-Thumbnail Generation Handler
-Generates thumbnails using Google AI Studio (Gemini) API
-"""
-
 import os
 import json
 import base64
@@ -12,6 +7,7 @@ import re
 from typing import Dict, Any, List, Optional
 import requests
 from supabase import Client
+from openai import OpenAI
 from .base import BaseHandler
 
 logger = logging.getLogger(__name__)
@@ -68,10 +64,17 @@ class ThumbnailGenerateHandler(BaseHandler):
             idea_brief_markdown = input_data.get("idea_brief_markdown")
             count = input_data.get("count", 2)
             
-            # Truncate idea brief if too long to avoid token limits
-            if idea_brief_markdown and len(idea_brief_markdown) > 10000:
-                logger.info(f"Truncating idea_brief_markdown from {len(idea_brief_markdown)} to 10000 chars")
-                idea_brief_markdown = idea_brief_markdown[:10000] + "...(truncated)"
+            # Summarize idea brief if too long to avoid token limits
+            if idea_brief_markdown and len(idea_brief_markdown) > 1000:
+                logger.info(f"Summarizing idea_brief_markdown (len={len(idea_brief_markdown)}) with LLM...")
+                try:
+                    idea_brief_markdown = self._summarize_idea_brief(idea_brief_markdown)
+                    logger.info(f"Summarized idea_brief_markdown to {len(idea_brief_markdown)} chars")
+                except Exception as e:
+                    logger.error(f"Failed to summarize idea brief: {e}")
+                    # Fallback to simple truncation if LLM fails
+                    if len(idea_brief_markdown) > 10000:
+                        idea_brief_markdown = idea_brief_markdown[:10000] + "...(truncated)"
             
             if not project_id:
                 return {"success": False, "error": "Missing required input: project_id"}
@@ -217,7 +220,34 @@ class ThumbnailGenerateHandler(BaseHandler):
             import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
             return {"success": False, "error": error_msg}
-    
+
+    def _summarize_idea_brief(self, text: str) -> str:
+        """Summarize a long idea brief using LLM"""
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError("OPENAI_API_KEY not found")
+        
+        client = OpenAI(api_key=api_key)
+        
+        system_prompt = (
+            "You are a visual design assistant. Summarize the following project brief "
+            "into a concise description (max 200 words) focusing ONLY on visual elements, "
+            "key themes, and text ideas suitable for a YouTube thumbnail. "
+            "Discard technical implementation details."
+        )
+        
+        response = client.chat.completions.create(
+            model=os.getenv("OPENAI_MODEL", "gpt-4o"),
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": text}
+            ],
+            temperature=0.3,
+            max_tokens=500
+        )
+        
+        return response.choices[0].message.content.strip()
+
     def download_from_storage(self, bucket: str, path: str) -> Optional[bytes]:
         """Download a file from Supabase storage"""
         try:
@@ -312,32 +342,32 @@ Video title context: "{title}"
 """
 
         if text_modifications and text_modifications.strip():
-            prompt += f"\nText changes (follow exactly): {text_modifications.strip()}\n"
+            prompt += f"\\nText changes (follow exactly): {text_modifications.strip()}\\n"
         else:
             if text_ideas:
-                ideas_block = "\n".join([f"- {t}" for t in text_ideas])
+                ideas_block = "\\n".join([f"- {t}" for t in text_ideas])
                 prompt += (
-                    "\nTEXT TASK: Replace the main headline text on the thumbnail.\n"
-                    "Choose ONE of the following candidate phrases (prefer short 2-5 words, BIG, high-contrast, ALL CAPS).\n"
-                    "Do NOT keep the existing headline text unless it already matches the idea.\n"
-                    f"{ideas_block}\n"
+                    "\\nTEXT TASK: Replace the main headline text on the thumbnail.\\n"
+                    "Choose ONE of the following candidate phrases (prefer short 2-5 words, BIG, high-contrast, ALL CAPS).\\n"
+                    "Do NOT keep the existing headline text unless it already matches the idea.\\n"
+                    f"{ideas_block}\\n"
                 )
             else:
                 prompt += (
-                    "\nTEXT TASK: Replace the main headline text on the thumbnail.\n"
-                    "Create a new short 2-5 word phrase that best matches the Idea Brief below.\n"
-                    "Do NOT keep the existing headline text unless it already matches the idea.\n"
+                    "\\nTEXT TASK: Replace the main headline text on the thumbnail.\\n"
+                    "Create a new short 2-5 word phrase that best matches the Idea Brief below.\\n"
+                    "Do NOT keep the existing headline text unless it already matches the idea.\\n"
                 )
         
         if idea_brief_markdown:
-            prompt += f"""\n\nIdea Brief: {idea_brief_markdown}
+            prompt += f"""\\n\\nIdea Brief: {idea_brief_markdown}
 Use this brief to decide what headline text should be on the thumbnail (prefer the 'Thumbnail Text Ideas' list if present).
 """
         
-        prompt += "\n\nOutput in 16:9 format."
+        prompt += "\\n\\nOutput in 16:9 format."
         
         if prompt_additions:
-            prompt += f"\n\nAdditional requirements: {prompt_additions}"
+            prompt += f"\\n\\nAdditional requirements: {prompt_additions}"
         
         return prompt
     
@@ -416,12 +446,24 @@ Use this brief to decide what headline text should be on the thumbnail (prefer t
                 
                 data = response.json()
                 
-                # Extract images from response
-                if data.get("candidates") and data["candidates"][0].get("content", {}).get("parts"):
-                    for part in data["candidates"][0]["content"]["parts"]:
+                # Check for candidates and content
+                candidates = data.get("candidates")
+                if candidates and candidates[0].get("content", {}).get("parts"):
+                    found_image = False
+                    for part in candidates[0]["content"]["parts"]:
                         if part.get("inlineData", {}).get("data"):
                             generated_images.append(part["inlineData"]["data"])
                             logger.info(f"Generated thumbnail {i+1}")
+                            found_image = True
+                    
+                    if not found_image:
+                        # Success response but no image data?
+                        logger.warning(f"Gemini returned candidates but no image data/text present: {json.dumps(data)}")
+                        last_error = f"Gemini returned 'success' but no image data. Finish reason: {candidates[0].get('finishReason', 'UNKNOWN')}"
+                else:
+                    # Success 200 OK, but no candidates? typical of safety blocks
+                    logger.error(f"Gemini returned 200 OK but no candidates (likely safety trigger). Full response: {json.dumps(data)}")
+                    last_error = f"Gemini returned 200 OK but no generated content. Full response: {json.dumps(data)}"
                 
             except Exception as e:
                 last_error = f"Failed to generate thumbnail {i+1}: {str(e)}"
