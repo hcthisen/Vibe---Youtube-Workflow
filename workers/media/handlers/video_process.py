@@ -9,7 +9,7 @@ from typing import Any, Dict
 from .base import BaseHandler
 from utils.vad_processor import process_video_vad
 from utils.transcription import transcribe_video, search_transcript_for_phrases, remove_segments_from_transcript
-from utils.llm_cuts import analyze_retake_cuts, apply_cuts_to_video
+from utils.llm_cuts import analyze_retake_cuts, apply_cuts_to_video, normalize_llm_model
 from utils.intro_transition import add_intro_transition
 
 logger = logging.getLogger(__name__)
@@ -38,7 +38,8 @@ class VideoProcessHandler(BaseHandler):
             retake_context_window = input_data.get("retake_context_window_seconds", 30)
             retake_min_confidence = input_data.get("retake_min_confidence", 0.7)
             retake_prefer_sentence_boundaries = input_data.get("retake_prefer_sentence_boundaries", True)
-            llm_model = input_data.get("llm_model", "gpt-4")
+            llm_model = input_data.get("llm_model", "gpt-4.1")
+            llm_model = normalize_llm_model(llm_model)
 
             logger.info(f"Starting video processing pipeline for asset {asset_id}")
 

@@ -467,7 +467,7 @@ const { data } = await supabase
 
 ### LLM-Based Retake Detection
 
-The video processing pipeline includes intelligent retake marker detection powered by OpenAI GPT-4. When users say phrases like "cut cut" during recording, the system uses AI to analyze the transcript and determine optimal cut points.
+The video processing pipeline includes intelligent retake marker detection powered by OpenAI GPT-4.1. When users say phrases like "cut cut" during recording, the system uses AI to analyze the transcript and determine optimal cut points.
 
 #### How It Works
 
@@ -477,7 +477,7 @@ The video processing pipeline includes intelligent retake marker detection power
    - VAD-based silence removal (Silero VAD)
    - Whisper transcription with word-level timestamps
    - Retake marker detection in transcript
-   - **LLM Analysis**: GPT-4 analyzes context around markers to determine cuts
+   - **LLM Analysis**: GPT-4.1 analyzes context around markers to determine cuts
    - FFmpeg applies cuts and concatenates remaining segments
 4. **Edit Report**: Detailed report includes LLM reasoning and confidence scores
 
@@ -488,9 +488,9 @@ Video Upload → VAD Silence Removal → Whisper Transcription
      ↓
 Retake Marker Search (e.g., "cut cut")
      ↓
-Extract Context Window (default: 30s before/after marker)
+Extract Context Window (pattern detection; full transcript sent to LLM)
      ↓
-LLM Analysis (GPT-4)
+LLM Analysis (GPT-4.1)
   - Identifies mistake start point
   - Determines natural cut boundaries
   - Returns cut timestamps + confidence scores
@@ -509,7 +509,7 @@ Users can configure retake detection in their profile settings:
   retake_context_window_seconds: number,       // Default: 30, Range: 10-120
   retake_min_confidence: number,               // Default: 0.7, Range: 0.0-1.0
   retake_prefer_sentence_boundaries: boolean,  // Default: true
-  llm_model: "gpt-4" | "gpt-4-turbo" | "gpt-4o" // Default: "gpt-4"
+  llm_model: "gpt-4.1" | "gpt-4.1-mini" // Default: "gpt-4.1"
 }
 ```
 
@@ -557,7 +557,7 @@ const { data: job } = await supabase
       retake_context_window_seconds: 30,
       retake_min_confidence: 0.7,
       retake_prefer_sentence_boundaries: true,
-      llm_model: "gpt-4",
+      llm_model: "gpt-4.1",
       apply_intro_transition: false
     }
   });
@@ -596,7 +596,7 @@ The processed video includes a detailed edit report:
     }
   ],
   "retake_analysis_settings": {
-    "llm_model": "gpt-4",
+    "llm_model": "gpt-4.1",
     "context_window_seconds": 30,
     "min_confidence": 0.7,
     "prefer_sentence_boundaries": true
@@ -672,14 +672,14 @@ OPENAI_API_KEY=sk-...  # Required for LLM retake analysis
 **Solution**:
 - Enable `retake_prefer_sentence_boundaries` (should be default)
 - Increase `silence_threshold_ms` for better VAD segment detection
-- Use `gpt-4o` model for better context understanding
+- Use `gpt-4.1` model for better context understanding
 
 #### Performance Notes
 
 - **LLM Analysis**: ~2-5 seconds per retake marker (depends on context window size)
-- **Cost**: ~$0.01-0.03 per video (typical 2-3 retakes with GPT-4)
+- **Cost**: ~$0.01-0.03 per video (typical 2-3 retakes with GPT-4.1)
 - **Fallback**: < 0.1 seconds (instant heuristic)
-- **Recommended**: Use `gpt-4-turbo` for 50% cost reduction with similar quality
+- **Recommended**: Use `gpt-4.1-mini` for faster, lower-cost runs
 
 #### Related Documentation
 

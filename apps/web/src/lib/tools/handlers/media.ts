@@ -97,7 +97,7 @@ export async function videoUploadFinalizeHandler(
           retake_context_window_seconds: profile?.retake_context_window_seconds || 30,
           retake_min_confidence: profile?.retake_min_confidence || 0.7,
           retake_prefer_sentence_boundaries: profile?.retake_prefer_sentence_boundaries ?? true,
-          llm_model: profile?.llm_model || "gpt-4",
+          llm_model: profile?.llm_model || "gpt-4.1",
         } as any,
       })
       .select()
@@ -134,4 +134,3 @@ export async function videoUploadFinalizeHandler(
     };
   }
 }
-

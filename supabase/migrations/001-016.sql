@@ -15,14 +15,14 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     retake_context_window_seconds INTEGER DEFAULT 30,
     retake_min_confidence DECIMAL(3,2) DEFAULT 0.70,
     retake_prefer_sentence_boundaries BOOLEAN DEFAULT true,
-    llm_model VARCHAR(50) DEFAULT 'gpt-4',
+    llm_model VARCHAR(50) DEFAULT 'gpt-4.1',
     retake_detection_enabled BOOLEAN DEFAULT false,
     thumbnail_preset_styles JSONB DEFAULT '[]'::jsonb,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     CONSTRAINT retake_context_window_range CHECK (retake_context_window_seconds >= 10 AND retake_context_window_seconds <= 120),
     CONSTRAINT retake_min_confidence_range CHECK (retake_min_confidence >= 0.0 AND retake_min_confidence <= 1.0),
-    CONSTRAINT llm_model_valid CHECK (llm_model IN ('gpt-4', 'gpt-4-turbo', 'gpt-4o'))
+    CONSTRAINT llm_model_valid CHECK (llm_model IN ('gpt-4.1', 'gpt-4.1-mini'))
 );
 
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;

@@ -28,6 +28,7 @@ RUN pip install --no-cache-dir -r workers/media/requirements.txt
 COPY workers/media/ ./workers/media/
 COPY supabase/ ./supabase/
 COPY ["Initial Templates - execution/video_effects", "/app/Initial Templates - execution/video_effects"]
+COPY ["Initial Templates - execution/pan_3d_transition.py", "/app/Initial Templates - execution/pan_3d_transition.py"]
 
 WORKDIR /app/Initial\ Templates\ -\ execution/video_effects
 RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi

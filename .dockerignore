@@ -73,6 +73,7 @@ PRD.md
 Initial Templates - */
 !Initial Templates - execution/video_effects/
 !Initial Templates - execution/video_effects/**
+!Initial Templates - execution/pan_3d_transition.py
 
 # Docker
 docker-compose.yml

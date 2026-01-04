@@ -153,7 +153,7 @@ Detects retake phrases (e.g., "cut cut", "oops") and uses AI to intelligently re
 When recording videos, speakers often make mistakes and say a retake phrase to signal they want to redo that part. This feature:
 
 1. **Searches** transcript for user-configured retake marker phrases
-2. **Analyzes** surrounding context using GPT-4 to understand what went wrong
+2. **Analyzes** surrounding context using GPT-4.1 to understand what went wrong
 3. **Determines** optimal cut points (handles 2-second mistakes to 30+ second false starts)
 4. **Applies** cuts via FFmpeg and updates the transcript
 
@@ -192,10 +192,10 @@ Users configure retake detection in their profile settings:
 | Setting | Type | Default | Range | Description |
 |---------|------|---------|-------|-------------|
 | `retake_markers` | string[] | `[]` | - | Comma-separated phrases that trigger detection |
-| `retake_context_window_seconds` | number | `30` | 10-120 | Context window size around markers for LLM |
+| `retake_context_window_seconds` | number | `30` | 10-120 | Pattern-detection window (LLM uses full transcript) |
 | `retake_min_confidence` | number | `0.7` | 0.0-1.0 | Minimum confidence to accept LLM cuts |
 | `retake_prefer_sentence_boundaries` | boolean | `true` | - | Prefer natural sentence boundaries |
-| `llm_model` | string | `gpt-4` | gpt-4, gpt-4-turbo, gpt-4o | OpenAI model for analysis |
+| `llm_model` | string | `gpt-4.1` | gpt-4.1, gpt-4.1-mini | OpenAI model for analysis |
 
 #### How It Works
 
@@ -226,7 +226,7 @@ pattern = detect_retake_pattern(context_words, match, transcript_words)
 
 **Step 4: LLM Analysis**
 ```python
-# Send context to GPT-4 with reasoning prompt
+# Send context to GPT-4.1 with reasoning prompt
 cut_instructions = analyze_retake_cuts(
     transcript_words=transcript_words,
     retake_matches=retake_matches,
@@ -234,7 +234,7 @@ cut_instructions = analyze_retake_cuts(
     context_window_seconds=30,
     min_confidence=0.7,
     prefer_sentence_boundaries=True,
-    model="gpt-4",
+    model="gpt-4.1",
     vad_segments=speech_segments
 )
 ```
@@ -245,7 +245,7 @@ You are analyzing a retake marker at 52.8s where the speaker said "cut cut".
 
 Pattern: full_redo (10+ second segment, speaker restarts completely)
 
-Transcript Context (30s window):
+Full Transcript with timestamps (excerpt):
 [22.8s - 23.2s] So
 [23.2s - 23.5s] today
 [23.5s - 23.9s] we're
@@ -334,7 +334,7 @@ Each processed video includes detailed retake analysis in the edit report:
     }
   ],
   "retake_analysis_settings": {
-    "llm_model": "gpt-4",
+    "llm_model": "gpt-4.1",
     "context_window_seconds": 30,
     "min_confidence": 0.7,
     "prefer_sentence_boundaries": true
@@ -373,9 +373,9 @@ Fallback cuts are marked with:
 #### Performance & Cost
 
 - **LLM Analysis Time**: 2-5 seconds per retake marker
-- **API Cost**: ~$0.01-0.03 per video (typical 2-3 retakes, GPT-4)
+- **API Cost**: ~$0.01-0.03 per video (typical 2-3 retakes, GPT-4.1)
 - **Fallback Time**: < 0.1 seconds (instant)
-- **Recommended**: Use `gpt-4-turbo` for 50% cost savings
+- **Recommended**: Use `gpt-4.1-mini` for faster, lower-cost runs
 
 #### Troubleshooting
 
@@ -385,7 +385,7 @@ Fallback cuts are marked with:
 - Increase `retake_min_confidence` to 0.8-0.9
 - Enable `retake_prefer_sentence_boundaries`
 - Review `llm_reasoning` in edit report
-- Use `gpt-4o` for better context understanding
+- Use `gpt-4.1` for better context understanding
 
 ---
 
@@ -404,7 +404,7 @@ Fallback cuts are marked with:
 **Solutions**:
 - Verify `OPENAI_API_KEY` is set in environment
 - Check OpenAI API usage limits
-- Verify model availability (gpt-4, gpt-4-turbo, gpt-4o)
+- Verify model availability (gpt-4.1, gpt-4.1-mini)
 - Review worker logs: `tail -f worker.log`
 - Fallback heuristics will still work
 
@@ -432,7 +432,7 @@ Fallback cuts are marked with:
 
 **Dependencies**:
 ```python
-from openai import OpenAI  # GPT-4 API
+from openai import OpenAI  # GPT-4.1 API
 import json, re, time      # Parsing and retries
 ```
 
@@ -865,4 +865,3 @@ For issues related to:
 - **Performance**: See performance tips in [Troubleshooting](#troubleshooting)
 
 See `AGENTS.md` in the project root for more details on the overall architecture.
-

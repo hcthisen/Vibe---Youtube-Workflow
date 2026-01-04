@@ -1,7 +1,7 @@
 """
 LLM Cuts Analyzer - Use LLM to analyze retake markers and generate cut instructions.
 
-This module uses OpenAI GPT-4 to intelligently analyze video transcripts with retake markers
+This module uses OpenAI GPT-4.1 to intelligently analyze video transcripts with retake markers
 and determine optimal cut points for video editing. It handles variable-length retake sessions,
 from quick 2-3 second mistakes to long 30+ second false starts.
 
@@ -33,6 +33,17 @@ DEFAULT_CONTEXT_WINDOW_SECONDS = 30
 DEFAULT_MIN_CONFIDENCE = 0.7
 DEFAULT_MAX_RETRIES = 3
 DEFAULT_RETRY_DELAY = 2.0
+
+MODEL_ALIASES = {
+    "gpt-4": "gpt-4.1",
+    "gpt-4-turbo": "gpt-4.1-mini",
+    "gpt-4o": "gpt-4.1",
+}
+
+
+def normalize_llm_model(model: str) -> str:
+    """Normalize legacy model names to the current GPT-4.1 family."""
+    return MODEL_ALIASES.get(model, model)
 
 
 def extract_context_window(
@@ -207,7 +218,7 @@ def analyze_retake_cuts(
     context_window_seconds: float = DEFAULT_CONTEXT_WINDOW_SECONDS,
     min_confidence: float = DEFAULT_MIN_CONFIDENCE,
     prefer_sentence_boundaries: bool = True,
-    model: str = "gpt-4",
+    model: str = "gpt-4.1",
     vad_segments: Optional[List[Tuple[float, float]]] = None
 ) -> List[Dict]:
     """
@@ -224,7 +235,7 @@ def analyze_retake_cuts(
         context_window_seconds: Size of context window around markers (default: 30s)
         min_confidence: Minimum confidence score to accept cuts (default: 0.7)
         prefer_sentence_boundaries: Use sentence boundaries for natural cuts (default: True)
-        model: OpenAI model to use (default: "gpt-4")
+        model: OpenAI model to use (default: "gpt-4.1")
         vad_segments: Optional VAD speech segments for better boundary detection
     
     Returns:
@@ -242,8 +253,13 @@ def analyze_retake_cuts(
     if not retake_matches:
         return []
     
+    model = normalize_llm_model(model)
+
     logger.info(f"Analyzing {len(retake_matches)} retake markers with LLM ({model})...")
-    logger.info(f"  Context window: {context_window_seconds}s, Min confidence: {min_confidence}")
+    logger.info(
+        "  Context window (pattern detection): "
+        f"{context_window_seconds}s, Min confidence: {min_confidence}"
+    )
     logger.info(f"  Processing ALL retake markers in a single LLM call for optimal analysis")
     
     client = OpenAI(api_key=api_key)
@@ -742,4 +758,3 @@ def apply_cuts_to_video(
         "cuts_applied": len(cut_instructions),
         "keep_segments": keep_segments
     }
-

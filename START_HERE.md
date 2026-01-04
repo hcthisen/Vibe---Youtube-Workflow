@@ -224,7 +224,7 @@ npm install
 ### Key Files Created
 - `workers/media/utils/vad_processor.py` - Neural silence detection
 - `workers/media/utils/transcription.py` - Whisper transcription
-- `workers/media/utils/llm_cuts.py` - GPT-4 retake analysis
+- `workers/media/utils/llm_cuts.py` - GPT-4.1 retake analysis
 - `workers/media/utils/intro_transition.py` - Transition effects
 - `apps/web/src/components/projects/VideoPlayer.tsx` - Dual video UI
 
