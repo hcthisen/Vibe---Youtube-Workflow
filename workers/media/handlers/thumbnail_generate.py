@@ -68,6 +68,11 @@ class ThumbnailGenerateHandler(BaseHandler):
             idea_brief_markdown = input_data.get("idea_brief_markdown")
             count = input_data.get("count", 2)
             
+            # Truncate idea brief if too long to avoid token limits
+            if idea_brief_markdown and len(idea_brief_markdown) > 10000:
+                logger.info(f"Truncating idea_brief_markdown from {len(idea_brief_markdown)} to 10000 chars")
+                idea_brief_markdown = idea_brief_markdown[:10000] + "...(truncated)"
+            
             if not project_id:
                 return {"success": False, "error": "Missing required input: project_id"}
             if not reference_thumbnail_url:
@@ -391,6 +396,7 @@ Use this brief to decide what headline text should be on the thumbnail (prefer t
         
         # Generate images (one at a time, as Gemini typically returns 1 image per request)
         generated_images = []
+        last_error = None
         
         for i in range(count):
             logger.info(f"Generating thumbnail {i+1}/{count}...")
@@ -404,7 +410,8 @@ Use this brief to decide what headline text should be on the thumbnail (prefer t
                 )
                 
                 if response.status_code != 200:
-                    logger.error(f"Gemini API error: {response.status_code} {response.text}")
+                    last_error = f"Gemini API error: {response.status_code} {response.text}"
+                    logger.error(last_error)
                     continue
                 
                 data = response.json()
@@ -417,7 +424,11 @@ Use this brief to decide what headline text should be on the thumbnail (prefer t
                             logger.info(f"Generated thumbnail {i+1}")
                 
             except Exception as e:
-                logger.error(f"Failed to generate thumbnail {i+1}: {e}")
+                last_error = f"Failed to generate thumbnail {i+1}: {str(e)}"
+                logger.error(last_error)
         
+        if not generated_images and last_error:
+            raise Exception(last_error)
+            
         return generated_images
 
