@@ -13,8 +13,8 @@ COPY apps/web/package.json ./apps/web/
 COPY packages/core/package.json ./packages/core/
 COPY packages/tools/package.json ./packages/tools/
 
-# Install dependencies (use npm install if package-lock.json doesn't exist)
-RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
+# Install dependencies (ensure dev deps are available for Next.js build)
+RUN if [ -f package-lock.json ]; then npm ci --include=dev; else npm install; fi
 
 # Rebuild the source code only when needed
 FROM base AS builder
@@ -88,4 +88,3 @@ ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
 CMD ["node", "apps/web/server.js"]
-
