@@ -177,11 +177,11 @@ export async function projectGenerateOutlineHandler(
     if (project.idea_brief_markdown) contextParts.push(`Idea Brief: ${project.idea_brief_markdown}`);
 
     // If no context, use empty string
-    const context = contextParts.join("\n\n");
+    const outlineContext = contextParts.join("\n\n");
 
     const result = await getOpenAIClient().generateOutline({
       title: project.title,
-      context,
+      context: outlineContext,
       existingHooks: idea?.title_variants || [],
     });
 
@@ -280,4 +280,3 @@ export async function projectGenerateTitlesHandler(
     };
   }
 }
-
