@@ -8,6 +8,7 @@ Requirements:
 - Node.js (for Remotion rendering)
 - Remotion dependencies installed in "Initial Templates - execution/video_effects/"
 """
+import importlib.util
 import logging
 import subprocess
 import os
@@ -124,17 +125,27 @@ def add_intro_transition(
     try:
         project_root = Path(__file__).parent.parent.parent.parent
         execution_dir = project_root / "Initial Templates - execution"
-        
-        # Add to path temporarily
-        sys.path.insert(0, str(execution_dir))
-        
-        try:
-            from pan_3d_transition import create_transition, get_video_info
-        finally:
-            # Remove from path
-            if str(execution_dir) in sys.path:
-                sys.path.remove(str(execution_dir))
-        
+        module_path = execution_dir / "pan_3d_transition.py"
+
+        if not module_path.exists():
+            raise FileNotFoundError(
+                f"pan_3d_transition.py not found at {module_path}"
+            )
+
+        spec = importlib.util.spec_from_file_location(
+            "pan_3d_transition",
+            module_path
+        )
+        if spec is None or spec.loader is None:
+            raise ImportError(f"Could not load spec for {module_path}")
+
+        pan_module = importlib.util.module_from_spec(spec)
+        sys.modules["pan_3d_transition"] = pan_module
+        spec.loader.exec_module(pan_module)
+
+        create_transition = pan_module.create_transition
+        get_video_info = pan_module.get_video_info
+
     except Exception as e:
         logger.error(f"Failed to import pan_3d_transition: {e}")
         logger.warning("Falling back to copying video")
@@ -368,4 +379,3 @@ def add_intro_transition(
                 os.remove(transition_path)
             except:
                 pass
-
