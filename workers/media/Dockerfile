@@ -4,9 +4,29 @@ FROM python:3.10-slim
 RUN apt-get update && apt-get install -y \
     build-essential \
     ffmpeg \
+    libasound2 \
+    libatk-bridge2.0-0 \
+    libatk1.0-0 \
+    libcups2 \
+    libdrm2 \
+    libgbm1 \
     libsm6 \
+    libnss3 \
     libxext6 \
+    libxss1 \
+    libxtst6 \
     libxrender-dev \
+    libx11-xcb1 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    libgtk-3-0 \
+    libxkbcommon0 \
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    libatspi2.0-0 \
+    libegl1 \
     libgomp1 \
     libsndfile1 \
     libglib2.0-0 \
