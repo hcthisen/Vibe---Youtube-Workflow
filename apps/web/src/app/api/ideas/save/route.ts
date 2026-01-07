@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
+import { getDataForSeoClient } from "@/lib/integrations/dataforseo";
+import { getOpenAIClient } from "@/lib/integrations/openai";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
@@ -15,119 +17,142 @@ export async function POST(request: NextRequest) {
 
     const { video_id, score, score_breakdown, search_result_id } = await request.json();
 
-    // First attempt: insert idea referencing an existing videos row.
-    // This can fail if the videos row wasn't stored (or an older worker version ran).
-    const attempt1 = await supabase
-      .from("ideas")
-      .insert({
-        user_id: user.id,
-        source_video_id: video_id,
-        search_result_id: search_result_id || null,
-        score,
-        score_breakdown,
-        status: "saved",
-      })
-      .select()
-      .single();
-
-    if (!attempt1.error && attempt1.data) {
-      return NextResponse.json({ idea: attempt1.data });
+    if (!video_id) {
+      return NextResponse.json({ error: "video_id is required" }, { status: 400 });
     }
 
-    // Fallback: reconstruct the video row from the stored search_results payload, then save idea.
-    if (!search_result_id) {
-      return NextResponse.json(
-        { error: attempt1.error?.message || "Failed to save idea (missing search_result_id for fallback)" },
-        { status: 500 }
-      );
-    }
-
-    const { data: searchResult, error: searchResultError } = await supabase
-      .from("search_results")
-      .select("id, results")
-      .eq("id", search_result_id)
+    let video = await supabase
+      .from("videos")
+      .select("id, youtube_video_id, title, thumbnail_url, channel_name, published_at, views_count")
+      .eq("id", video_id)
       .eq("user_id", user.id)
       .single();
 
-    if (searchResultError || !searchResult) {
-      return NextResponse.json(
-        { error: searchResultError?.message || "Failed to load search result for fallback save" },
-        { status: 500 }
-      );
+    if (video.error || !video.data) {
+      if (!search_result_id) {
+        return NextResponse.json(
+          { error: video.error?.message || "Failed to save idea (missing search_result_id for fallback)" },
+          { status: 500 }
+        );
+      }
+
+      const { data: searchResult, error: searchResultError } = await supabase
+        .from("search_results")
+        .select("id, results")
+        .eq("id", search_result_id)
+        .eq("user_id", user.id)
+        .single();
+
+      if (searchResultError || !searchResult) {
+        return NextResponse.json(
+          { error: searchResultError?.message || "Failed to load search result for fallback save" },
+          { status: 500 }
+        );
+      }
+
+      const results = Array.isArray(searchResult.results) ? (searchResult.results as any[]) : [];
+      const matching = results.find((r) => r?.video_id === video_id);
+
+      if (!matching) {
+        return NextResponse.json(
+          { error: "Failed to save idea: could not find matching video in search_results payload" },
+          { status: 500 }
+        );
+      }
+
+      const upsertVideo = await supabase
+        .from("videos")
+        .upsert(
+          {
+            id: video_id,
+            user_id: user.id,
+            source: "research",
+            youtube_video_id: matching.youtube_video_id ?? null,
+            title: matching.title ?? "(untitled)",
+            thumbnail_url: matching.thumbnail_url ?? null,
+            published_at: matching.published_at ?? null,
+            views_count: matching.views_count ?? null,
+            channel_name: matching.channel_name ?? null,
+          },
+          {
+            onConflict: "user_id,youtube_video_id",
+          }
+        )
+        .select("id, youtube_video_id, title, thumbnail_url, channel_name, published_at, views_count")
+        .single();
+
+      if (upsertVideo.error || !upsertVideo.data) {
+        return NextResponse.json(
+          { error: upsertVideo.error?.message || "Failed to save idea: could not create video row" },
+          { status: 500 }
+        );
+      }
+
+      video = upsertVideo;
     }
 
-    const results = Array.isArray(searchResult.results) ? (searchResult.results as any[]) : [];
-    const matching = results.find((r) => r?.video_id === video_id);
+    const videoData = video.data;
 
-    if (!matching) {
-      return NextResponse.json(
-        {
-          error:
-            attempt1.error?.message ||
-            "Failed to save idea: could not find matching video in search_results payload",
-        },
-        { status: 500 }
-      );
-    }
+    let transcript: string | null = null;
+    let transcriptLanguage: string | null = null;
 
-    // Create or upsert a videos row for this user/video
-    const upsertVideo = await supabase
-      .from("videos")
-      .upsert(
-        {
-          // Keep the same UUID so ideas.source_video_id can reference it deterministically
-          id: video_id,
-          user_id: user.id,
-          source: "research",
-          youtube_video_id: matching.youtube_video_id ?? null,
-          title: matching.title ?? "(untitled)",
-          thumbnail_url: matching.thumbnail_url ?? null,
-          published_at: matching.published_at ?? null,
-          views_count: matching.views_count ?? null,
-          channel_name: matching.channel_name ?? null,
-        },
-        {
-          // Prefer upsert by (user_id, youtube_video_id) so repeats don't duplicate
-          // (requires migration 009_make_videos_upsertable.sql)
-          onConflict: "user_id,youtube_video_id",
+    if (videoData.youtube_video_id) {
+      try {
+        const subtitles = await getDataForSeoClient().getVideoSubtitles(videoData.youtube_video_id);
+        if (subtitles.success) {
+          transcript = subtitles.transcript || null;
+          transcriptLanguage = subtitles.language || null;
         }
-      )
-      .select("id")
-      .single();
-
-    if (upsertVideo.error || !upsertVideo.data) {
-      return NextResponse.json(
-        {
-          error:
-            upsertVideo.error?.message ||
-            attempt1.error?.message ||
-            "Failed to save idea: could not create corresponding video row",
-        },
-        { status: 500 }
-      );
+      } catch (subtitleError) {
+        console.error("Failed to fetch subtitles:", subtitleError);
+      }
     }
 
-    const attempt2 = await supabase
+    let aiSummary: string | null = null;
+    let hookOptions: string[] = [];
+    let thumbnailTextIdeas: string[] = [];
+
+    if (videoData.title) {
+      try {
+        const ideaDetails = await getOpenAIClient().generateOutlierIdeaDetails({
+          title: videoData.title,
+          channelName: videoData.channel_name,
+          transcript,
+        });
+
+        if (ideaDetails.success) {
+          aiSummary = ideaDetails.summary || null;
+          hookOptions = ideaDetails.hook_options || [];
+          thumbnailTextIdeas = ideaDetails.thumbnail_text_ideas || [];
+        }
+      } catch (llmError) {
+        console.error("Outlier idea enrichment failed:", llmError);
+      }
+    }
+
+    const { data: idea, error } = await supabase
       .from("ideas")
       .insert({
         user_id: user.id,
-        source_video_id: upsertVideo.data.id,
+        source_video_id: videoData.id,
         search_result_id: search_result_id || null,
-        score,
-        score_breakdown,
+        score: score || 0,
+        score_breakdown: score_breakdown || {},
+        ai_summary: aiSummary,
+        hook_options: hookOptions,
+        title_variants: thumbnailTextIdeas,
+        transcript,
+        transcript_language: transcriptLanguage,
         status: "saved",
       })
       .select()
       .single();
 
-    if (attempt2.error || !attempt2.data) {
-      return NextResponse.json(
-        { error: attempt2.error?.message || attempt1.error?.message || "Failed to save idea" },
-        { status: 500 }
-      );
+    if (error || !idea) {
+      return NextResponse.json({ error: error?.message || "Failed to save idea" }, { status: 500 });
     }
 
-    return NextResponse.json({ idea: attempt2.data });
+    return NextResponse.json({ idea });
   } catch (error) {
     console.error("Save idea error:", error);
     return NextResponse.json(

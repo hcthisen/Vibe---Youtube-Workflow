@@ -78,27 +78,52 @@ export async function outlierSearchHandler(
   try {
     logs.push(`Searching for outliers with keywords: ${input.keywords.join(", ")}`);
 
-    const result = await getDataForSeoClient().searchVideos({
-      keywords: input.keywords,
-      limit: input.limit || 50,
-      language_code: input.language_code,
-      location_code: input.location_code,
-    });
+    const keywordQueries = input.keywords.map((k) => k.trim()).filter(Boolean);
+    if (keywordQueries.length === 0) {
+      return { success: false, error: "At least one keyword is required", logs };
+    }
+    const searchPromises = keywordQueries.map((query) =>
+      getDataForSeoClient().searchVideos({
+        keywords: [query],
+        limit: input.limit || 50,
+        language_code: input.language_code,
+        location_code: input.location_code,
+      })
+    );
 
-    if (!result.success) {
-      return { success: false, error: result.error, logs };
+    const searchResults = await Promise.all(searchPromises);
+    const failedSearches = searchResults.filter((r) => !r.success);
+    const allVideos = searchResults.flatMap((r) => (r.success ? r.videos : []));
+
+    if (failedSearches.length === searchResults.length) {
+      return { success: false, error: failedSearches[0]?.error || "Search failed", logs };
     }
 
-    logs.push(`Found ${result.videos.length} videos from DataForSEO`);
+    logs.push(
+      `Ran ${keywordQueries.length} search query${keywordQueries.length === 1 ? "" : "ies"}`
+    );
+    logs.push(`Found ${allVideos.length} videos from DataForSEO`);
 
     // Check if we got any videos at all
-    if (result.videos.length === 0) {
+    if (allVideos.length === 0) {
       return {
         success: false,
         error: `No videos found for keywords: ${input.keywords.join(", ")}. Try different keywords or broaden your search.`,
         logs,
       };
     }
+
+    // Deduplicate by youtube video ID
+    const uniqueByYoutubeId = new Map<string, (typeof allVideos)[number]>();
+    for (const video of allVideos) {
+      if (!video.youtube_video_id) continue;
+      if (!uniqueByYoutubeId.has(video.youtube_video_id)) {
+        uniqueByYoutubeId.set(video.youtube_video_id, video);
+      }
+    }
+
+    const dedupedVideos = Array.from(uniqueByYoutubeId.values());
+    logs.push(`Deduplicated to ${dedupedVideos.length} unique videos`);
 
     // Get user's channel baseline for scoring
     const supabase = await createServiceClient();
@@ -112,7 +137,7 @@ export async function outlierSearchHandler(
     logs.push(`Using channel baseline: ${channelAvgViews} avg views`);
 
     // Calculate scores
-    const scoredResults = result.videos.map((video) => {
+    const scoredResults = dedupedVideos.map((video) => {
       const views = video.views_count || 0;
       const publishedAt = video.published_at ? new Date(video.published_at) : new Date();
       const ageInDays = (Date.now() - publishedAt.getTime()) / (1000 * 60 * 60 * 24);
@@ -208,8 +233,14 @@ export async function outlierSearchHandler(
     // Sort by score
     filteredResults.sort((a, b) => b.score - a.score);
 
+    const maxResults = input.limit || filteredResults.length;
+    const finalResults = filteredResults.slice(0, maxResults);
+    if (finalResults.length < filteredResults.length) {
+      logs.push(`Trimmed results to top ${finalResults.length} by score`);
+    }
+
     // Store videos in database (remove age_in_days before storing)
-    for (const video of filteredResults) {
+    for (const video of finalResults) {
       const { age_in_days, ...videoData } = video;
       await supabase.from("videos").upsert({
         id: videoData.video_id,
@@ -226,16 +257,16 @@ export async function outlierSearchHandler(
       });
     }
 
-    logs.push(`Stored ${filteredResults.length} videos in database`);
+    logs.push(`Stored ${finalResults.length} videos in database`);
 
     // Remove age_in_days from final results
-    const finalResults = filteredResults.map(({ age_in_days, ...video }) => video);
+    const outputResults = finalResults.map(({ age_in_days, ...video }) => video);
 
     return {
       success: true,
       data: {
-        results: finalResults,
-        total_found: finalResults.length,
+        results: outputResults,
+        total_found: outputResults.length,
       },
       logs,
     };
@@ -276,6 +307,7 @@ export async function deepResearchHandler(
       baselineKeywords,
       avoidTopics: input.avoid_topics || [],
       targetViewer: input.target_viewer_description,
+      focusTopic: input.focus_topic,
       count: input.idea_count || 20,
     });
 

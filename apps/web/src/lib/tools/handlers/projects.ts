@@ -107,11 +107,25 @@ function generateIdeaBriefMarkdown(idea: any): string {
     sections.push("");
   }
 
+  // Why Now
+  if (idea.why_now) {
+    sections.push("## Why Now\n");
+    sections.push(`${idea.why_now}\n`);
+  }
+
   // Thumbnail Ideas
   if (idea.title_variants && Array.isArray(idea.title_variants) && idea.title_variants.length > 0) {
     sections.push("## Thumbnail Text Ideas\n");
     idea.title_variants.forEach((variant: string) => {
       sections.push(`- ${variant}`);
+    });
+    sections.push("");
+  }
+
+  if (idea.search_queries_used && Array.isArray(idea.search_queries_used) && idea.search_queries_used.length > 0) {
+    sections.push("## Search Queries Used\n");
+    idea.search_queries_used.forEach((query: string) => {
+      sections.push(`- ${query}`);
     });
     sections.push("");
   }

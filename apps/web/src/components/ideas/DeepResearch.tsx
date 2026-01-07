@@ -28,6 +28,7 @@ export function DeepResearch({ baselineKeywords }: DeepResearchProps) {
   const router = useRouter();
   const [avoidTopics, setAvoidTopics] = useState("");
   const [targetViewer, setTargetViewer] = useState("");
+  const [focusTopic, setFocusTopic] = useState("");
   const [ideaCount, setIdeaCount] = useState(20);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -165,6 +166,7 @@ export function DeepResearch({ baselineKeywords }: DeepResearchProps) {
         body: JSON.stringify({
           avoid_topics: avoidTopicsList,
           target_viewer_description: targetViewer || undefined,
+          focus_topic: focusTopic || undefined,
           idea_count: ideaCount,
         }),
       });
@@ -204,6 +206,9 @@ export function DeepResearch({ baselineKeywords }: DeepResearchProps) {
     if (params.target_viewer_description) {
       setTargetViewer(params.target_viewer_description);
     }
+    if (params.focus_topic) {
+      setFocusTopic(params.focus_topic);
+    }
     if (params.idea_count) {
       setIdeaCount(params.idea_count);
     }
@@ -219,8 +224,10 @@ export function DeepResearch({ baselineKeywords }: DeepResearchProps) {
         body: JSON.stringify({
           title_concept: idea.title_concept,
           thesis: idea.thesis,
+          why_now: idea.why_now,
           hook_options: idea.hook_options,
           thumbnail_text_ideas: idea.thumbnail_text_ideas,
+          search_queries_used: idea.search_queries_used,
           search_result_id: currentSearchId,
         }),
       });
@@ -297,6 +304,20 @@ export function DeepResearch({ baselineKeywords }: DeepResearchProps) {
 
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
+              Focus Topic
+            </label>
+            <input
+              type="text"
+              value={focusTopic}
+              onChange={(e) => setFocusTopic(e.target.value)}
+              placeholder="e.g., AI editing workflows"
+              className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors"
+            />
+            <p className="mt-1 text-sm text-gray-500">Optional topic to narrow ideas</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
               Number of Ideas
             </label>
             <select
@@ -357,7 +378,9 @@ export function DeepResearch({ baselineKeywords }: DeepResearchProps) {
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-white truncate">
-                        {history.search_params.target_viewer_description || "Deep Research"}
+                        {history.search_params.focus_topic ||
+                          history.search_params.target_viewer_description ||
+                          "Deep Research"}
                       </p>
                       <p className="text-xs text-gray-500 mt-1">
                         {history.results_count} ideas • {new Date(history.created_at).toLocaleDateString()}

@@ -9,6 +9,7 @@ interface GenerateIdeasParams {
   baselineKeywords: string[];
   avoidTopics: string[];
   targetViewer?: string;
+  focusTopic?: string;
   count: number;
 }
 
@@ -78,6 +79,20 @@ interface GenerateYouTubeDescriptionParams {
 interface GenerateYouTubeDescriptionResult {
   success: boolean;
   description: string;
+  error?: string;
+}
+
+interface GenerateOutlierIdeaParams {
+  title: string;
+  channelName?: string | null;
+  transcript?: string | null;
+}
+
+interface GenerateOutlierIdeaResult {
+  success: boolean;
+  summary: string;
+  hook_options: string[];
+  thumbnail_text_ideas: string[];
   error?: string;
 }
 
@@ -216,6 +231,8 @@ ${params.avoidTopics.length > 0 ? `Topics to avoid: ${params.avoidTopics.join(",
 ${params.targetViewer ? `Target viewer: ${params.targetViewer}` : ""}`;
 
       const userPrompt = `Generate ${params.count} unique video ideas that would perform well based on the niche context.
+
+${params.focusTopic ? `Focus topic: ${params.focusTopic}` : ""}
 
 For each idea, provide:
 - title_concept: A working title for the video
@@ -453,6 +470,59 @@ Respond with JSON: { "description": "..." }`;
       return {
         success: false,
         description: "",
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  }
+
+  async generateOutlierIdeaDetails(
+    params: GenerateOutlierIdeaParams
+  ): Promise<GenerateOutlierIdeaResult> {
+    try {
+      const systemPrompt = `You are a YouTube strategist. Turn a source video into a new idea the creator could make.
+You must respond with valid JSON only.`;
+
+      const userPrompt = `Write a short idea summary (1-2 sentences) of what the creator could/should make based on this source video.
+
+Source title: ${params.title}
+${params.channelName ? `Channel: ${params.channelName}` : ""}
+
+Transcript (if available):
+${params.transcript || "Transcript not available."}
+
+Return:
+- summary: 1-2 sentence idea summary, written in the creator's voice ("I" statements)
+- hook_options: 3 punchy hook options
+- thumbnail_text_ideas: 3-5 short thumbnail text ideas (2-4 words each)
+
+Respond with JSON: { "summary": "...", "hook_options": [...], "thumbnail_text_ideas": [...] }`;
+
+      const response = await this.chat(
+        [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        { temperature: 0.7, maxTokens: 1200 }
+      );
+
+      const parsed = this.parseJsonResponse<{
+        summary: string;
+        hook_options: string[];
+        thumbnail_text_ideas: string[];
+      }>(response);
+
+      return {
+        success: true,
+        summary: parsed.summary || "",
+        hook_options: parsed.hook_options || [],
+        thumbnail_text_ideas: parsed.thumbnail_text_ideas || [],
+      };
+    } catch (error) {
+      return {
+        success: false,
+        summary: "",
+        hook_options: [],
+        thumbnail_text_ideas: [],
         error: error instanceof Error ? error.message : "Unknown error",
       };
     }

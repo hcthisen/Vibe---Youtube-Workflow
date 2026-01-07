@@ -50,6 +50,9 @@ export function OutlierSearch({ baselineKeywords }: OutlierSearchProps) {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [jobStatus, setJobStatus] = useState<string | null>(null);
+  const [savingIdeaId, setSavingIdeaId] = useState<string | null>(null);
+  const [savingPresetId, setSavingPresetId] = useState<string | null>(null);
+  const [savedPresetIds, setSavedPresetIds] = useState<string[]>([]);
   const isQueued = jobStatus === "queued" || jobStatus === "search_queued";
   const isRunning = jobStatus === "running" || jobStatus === "search_running";
 
@@ -199,6 +202,7 @@ export function OutlierSearch({ baselineKeywords }: OutlierSearchProps) {
 
   const handleSaveIdea = async (result: SearchResult) => {
     try {
+      setSavingIdeaId(result.video_id);
       const response = await fetch("/api/ideas/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -224,6 +228,44 @@ export function OutlierSearch({ baselineKeywords }: OutlierSearchProps) {
     } catch (err) {
       console.error("Save error:", err);
       setError(err instanceof Error ? err.message : "Failed to save idea");
+    } finally {
+      setSavingIdeaId(null);
+    }
+  };
+
+  const handleAddPreset = async (result: SearchResult) => {
+    if (!result.thumbnail_url) {
+      setError("This video does not have a thumbnail URL to save.");
+      return;
+    }
+
+    if (savedPresetIds.includes(result.video_id)) {
+      return;
+    }
+
+    try {
+      setSavingPresetId(result.video_id);
+      const response = await fetch("/api/thumbnail-presets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          image_url: result.thumbnail_url,
+          name: result.title || "Outlier thumbnail",
+        }),
+      });
+
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        const message = payload?.error || `Failed to save preset (HTTP ${response.status})`;
+        throw new Error(message);
+      }
+
+      setSavedPresetIds((prev) => [...prev, result.video_id]);
+    } catch (err) {
+      console.error("Preset save error:", err);
+      setError(err instanceof Error ? err.message : "Failed to save preset");
+    } finally {
+      setSavingPresetId(null);
     }
   };
 
@@ -442,9 +484,21 @@ export function OutlierSearch({ baselineKeywords }: OutlierSearchProps) {
                   <div className="flex-shrink-0 flex flex-col gap-2">
                     <button
                       onClick={() => handleSaveIdea(result)}
-                      className="px-4 py-2 bg-accent-600 hover:bg-accent-700 text-white text-sm font-medium rounded-lg transition-colors"
+                      disabled={savingIdeaId === result.video_id}
+                      className="px-4 py-2 bg-accent-600 hover:bg-accent-700 disabled:bg-accent-600/60 text-white text-sm font-medium rounded-lg transition-colors"
                     >
-                      Save Idea
+                      {savingIdeaId === result.video_id ? "Saving..." : "Save Idea"}
+                    </button>
+                    <button
+                      onClick={() => handleAddPreset(result)}
+                      disabled={savingPresetId === result.video_id || savedPresetIds.includes(result.video_id)}
+                      className="px-4 py-2 border border-gray-600 hover:border-gray-500 disabled:border-gray-700 text-gray-300 disabled:text-gray-500 text-sm font-medium rounded-lg transition-colors"
+                    >
+                      {savedPresetIds.includes(result.video_id)
+                        ? "Preset Added"
+                        : savingPresetId === result.video_id
+                        ? "Saving..."
+                        : "Add to Presets"}
                     </button>
                     <a
                       href={`https://youtube.com/watch?v=${result.youtube_video_id}`}

@@ -155,6 +155,10 @@ export interface Database {
           ai_summary: string | null;
           title_variants: Json;
           hook_options: Json;
+          why_now: string | null;
+          search_queries_used: Json | null;
+          transcript: string | null;
+          transcript_language: string | null;
           status: string;
           created_at: string;
           updated_at: string;
@@ -169,6 +173,10 @@ export interface Database {
           ai_summary?: string | null;
           title_variants?: Json;
           hook_options?: Json;
+          why_now?: string | null;
+          search_queries_used?: Json | null;
+          transcript?: string | null;
+          transcript_language?: string | null;
           status?: string;
           created_at?: string;
           updated_at?: string;
@@ -183,6 +191,10 @@ export interface Database {
           ai_summary?: string | null;
           title_variants?: Json;
           hook_options?: Json;
+          why_now?: string | null;
+          search_queries_used?: Json | null;
+          transcript?: string | null;
+          transcript_language?: string | null;
           status?: string;
           created_at?: string;
           updated_at?: string;

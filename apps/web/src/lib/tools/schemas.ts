@@ -60,6 +60,7 @@ export const outlierSearchOutputSchema = z.object({
 export const deepResearchInputSchema = z.object({
   avoid_topics: z.array(z.string()).optional().default([]),
   target_viewer_description: z.string().optional(),
+  focus_topic: z.string().optional(),
   idea_count: z.number().optional().default(20),
 });
 
