@@ -23,6 +23,7 @@ export interface Database {
           retake_min_confidence: number;
           retake_prefer_sentence_boundaries: boolean;
           llm_model: string;
+          thumbnail_preset_styles: Json | null;
           created_at: string;
           updated_at: string;
         };
@@ -39,6 +40,7 @@ export interface Database {
           retake_min_confidence?: number;
           retake_prefer_sentence_boundaries?: boolean;
           llm_model?: string;
+          thumbnail_preset_styles?: Json | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -55,6 +57,7 @@ export interface Database {
           retake_min_confidence?: number;
           retake_prefer_sentence_boundaries?: boolean;
           llm_model?: string;
+          thumbnail_preset_styles?: Json | null;
           created_at?: string;
           updated_at?: string;
         };
