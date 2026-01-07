@@ -183,7 +183,11 @@ export default async function ProjectPage({
           {/* Transcript Section */}
           {transcript && (
             <section className="bg-gray-800/30 border border-gray-700 rounded-xl p-6">
-              <TranscriptViewer asset={transcript} projectId={project.id} />
+              <TranscriptViewer
+                asset={transcript}
+                projectId={project.id}
+                initialDescription={project.youtube_description}
+              />
             </section>
           )}
         </div>

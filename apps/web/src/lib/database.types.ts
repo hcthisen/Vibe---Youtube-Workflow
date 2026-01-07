@@ -199,6 +199,7 @@ export interface Database {
           outline: Json | null;
           title_variants: Json | null;
           idea_brief_markdown: string | null;
+          youtube_description: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -211,6 +212,7 @@ export interface Database {
           outline?: Json | null;
           title_variants?: Json | null;
           idea_brief_markdown?: string | null;
+          youtube_description?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -223,6 +225,7 @@ export interface Database {
           outline?: Json | null;
           title_variants?: Json | null;
           idea_brief_markdown?: string | null;
+          youtube_description?: string | null;
           created_at?: string;
           updated_at?: string;
         };

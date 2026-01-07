@@ -659,7 +659,7 @@ OPENAI_API_KEY=sk-...  # Required for LLM retake analysis
 **Solution**:
 - Verify `OPENAI_API_KEY` is set in worker environment
 - Check OpenAI API usage limits
-- Verify selected `llm_model` is available
+- Verify `OPENAI_MODEL` is available
 - Review worker logs for specific error messages
 - Fallback heuristics will still work
 

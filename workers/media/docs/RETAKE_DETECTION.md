@@ -20,10 +20,10 @@
 
 ## Overview
 
-The LLM-based retake detection system uses artificial intelligence (GPT-4.1) to intelligently identify and remove mistakes in video recordings. When a speaker says a retake phrase like "cut cut" or "oops", the system:
+The LLM-based retake detection system uses artificial intelligence (GPT-5.2) to intelligently identify and remove mistakes in video recordings. When a speaker says a retake phrase like "cut cut" or "oops", the system:
 
 1. **Locates** the retake marker in the transcript
-2. **Analyzes** the surrounding context using GPT-4.1
+2. **Analyzes** the surrounding context using GPT-5.2
 3. **Determines** where the mistake actually begins (not just a fixed duration)
 4. **Applies** precise cuts to remove both the mistake and retake phrase
 5. **Preserves** the successful retake content
@@ -51,7 +51,7 @@ graph TD
     F -->|No| I
     F -->|Yes| G[Extract Context Windows]
     G --> H[Detect Patterns]
-    H --> J[LLM Analysis GPT-4.1]
+    H --> J[LLM Analysis GPT-5.2]
     J --> K{Confidence<br/>OK?}
     K -->|Yes| L[Apply Cuts]
     K -->|No| M[Enhanced Fallback]
@@ -175,7 +175,7 @@ def identify_sentence_boundaries(words, min_pause_seconds=0.5):
 
 ### Step 5: LLM Analysis
 
-Send full transcript to GPT-4.1 with reasoning prompts (context window used for pattern detection):
+Send full transcript to GPT-5.2 with reasoning prompts (context window used for pattern detection):
 
 ```python
 def analyze_retake_cuts(
@@ -185,7 +185,7 @@ def analyze_retake_cuts(
     context_window_seconds=30,
     min_confidence=0.7,
     prefer_sentence_boundaries=True,
-    model="gpt-4.1",
+    model="gpt-5.2",
     vad_segments=None
 ):
     """
@@ -195,7 +195,7 @@ def analyze_retake_cuts(
     1. Extract context window
     2. Detect pattern
     3. Build reasoning prompt with full transcript
-    4. Call GPT-4.1 API with retry logic
+    4. Call GPT-5.2 API with retry logic
     5. Parse JSON response
     6. Filter by confidence
     7. Merge overlapping cuts
@@ -235,7 +235,7 @@ retake_markers                     JSONB    -- ["cut cut", "oops"]
 retake_context_window_seconds     INTEGER  -- 30 (range: 10-120)
 retake_min_confidence             DECIMAL  -- 0.70 (range: 0.0-1.0)
 retake_prefer_sentence_boundaries BOOLEAN  -- true
-llm_model                         VARCHAR  -- "gpt-4.1"
+llm_model                         VARCHAR  -- legacy (ignored)
 ```
 
 ### Settings UI
@@ -255,7 +255,7 @@ Location: `/dashboard/settings`
 | **Context Window** | integer | 30 | 10-120 | Pattern detection window; LLM uses full transcript |
 | **Min Confidence** | float | 0.7 | 0.0-1.0 | Higher = more selective, more fallbacks |
 | **Prefer Boundaries** | boolean | true | - | Smoother cuts at sentence ends |
-| **LLM Model** | enum | gpt-4.1 | gpt-4.1, gpt-4.1-mini | Speed/cost tradeoff |
+| **LLM Model** | enum | gpt-5.2 | gpt-5.2 | Set via `OPENAI_MODEL` env var |
 
 ### Environment Variables (Worker)
 
@@ -264,6 +264,7 @@ Location: `/dashboard/settings`
 OPENAI_API_KEY=sk-...
 
 # Optional: Override defaults
+OPENAI_MODEL=gpt-5.2
 WORKER_TEMP_DIR=/tmp/yt-worker
 WHISPER_MODEL=base
 ```
@@ -350,7 +351,7 @@ Include AT LEAST two cuts:
 ### Temperature & Parameters
 
 ```python
-model = "gpt-4.1"
+model = "gpt-5.2"
 temperature = 0.2  # Low for consistency
 max_tokens = 3000  # Enough for reasoning + JSON
 ```
@@ -605,7 +606,7 @@ cut_start = max(0, retake_start - 10.0)
 
 ### Cost (OpenAI API)
 
-**GPT-4.1 Pricing** (as of Jan 2026):
+**GPT-5.2 Pricing** (as of Jan 2026):
 - Input: $0.03 / 1K tokens
 - Output: $0.06 / 1K tokens
 
@@ -617,7 +618,7 @@ cut_start = max(0, retake_start - 10.0)
 **Video with 2-3 retakes**: ~$0.10 total
 
 **Cost Optimization**:
-- Use `gpt-4.1-mini`: 50% cheaper ($0.01 / 1K input)
+- Use `gpt-5.2`: 50% cheaper ($0.01 / 1K input)
 - Reduce `context_window_seconds` to 20s: 33% fewer tokens
 - Increase `min_confidence` to rely more on fallback
 
@@ -625,8 +626,8 @@ cut_start = max(0, retake_start - 10.0)
 
 | Model | Use Case | Cost | Speed |
 |-------|----------|------|-------|
-| **gpt-4.1** | Best accuracy | $$ | 3-5s |
-| **gpt-4.1-mini** | Balanced (recommended) | $ | 2-3s |
+| **gpt-5.2** | Best accuracy | $$ | 3-5s |
+| **gpt-5.2** | Balanced (recommended) | $ | 2-3s |
 
 ---
 
@@ -709,7 +710,7 @@ cut_start = max(0, retake_start - 10.0)
    ```
 5. **Try different model**:
    ```
-   llm_model: "gpt-4.1-mini"
+   llm_model: "gpt-5.2"
    ```
 
 ### Problem: Cuts Don't Align With Pauses
@@ -770,7 +771,7 @@ def analyze_retake_cuts(
     context_window_seconds: float = 30,
     min_confidence: float = 0.7,
     prefer_sentence_boundaries: bool = True,
-    model: str = "gpt-4.1",
+    model: str = "gpt-5.2",
     vad_segments: Optional[List[Tuple[float, float]]] = None
 ) -> List[Dict]:
     """
@@ -785,7 +786,7 @@ def analyze_retake_cuts(
         context_window_seconds: Context size around markers (10-120)
         min_confidence: Min score to accept cuts (0.0-1.0)
         prefer_sentence_boundaries: Use natural cut points
-        model: OpenAI model ("gpt-4.1", "gpt-4.1-mini")
+        model: OpenAI model ("gpt-5.2", "gpt-5.2")
         vad_segments: Optional VAD speech segments for fallback
             [(start, end), ...]
     

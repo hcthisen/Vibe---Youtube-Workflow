@@ -31,13 +31,16 @@ interface WordLevelTranscript {
 interface TranscriptViewerProps {
   asset: Asset;
   projectId: string;
+  initialDescription?: string | null;
 }
 
-export function TranscriptViewer({ asset, projectId }: TranscriptViewerProps) {
+export function TranscriptViewer({ asset, projectId, initialDescription }: TranscriptViewerProps) {
   const [transcript, setTranscript] = useState<Transcript | null>(null);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<"full" | "segments">("full");
-  const [description, setDescription] = useState<string>("");
+  const [description, setDescription] = useState<string>(initialDescription || "");
+  const [draftDescription, setDraftDescription] = useState<string>(initialDescription || "");
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [descriptionLoading, setDescriptionLoading] = useState(false);
   const [descriptionError, setDescriptionError] = useState<string | null>(null);
 
@@ -46,6 +49,11 @@ export function TranscriptViewer({ asset, projectId }: TranscriptViewerProps) {
   useEffect(() => {
     loadTranscript();
   }, [asset.id]);
+
+  useEffect(() => {
+    setDescription(initialDescription || "");
+    setDraftDescription(initialDescription || "");
+  }, [initialDescription]);
 
   const convertWordLevelToSegments = (words: WordLevelTranscript[]): Transcript => {
     const segments: TranscriptSegment[] = [];
@@ -149,9 +157,40 @@ export function TranscriptViewer({ asset, projectId }: TranscriptViewerProps) {
         throw new Error(result.error || "Failed to generate description");
       }
 
-      setDescription(result.description || "");
+      const nextDescription = result.description || "";
+      setDescription(nextDescription);
+      setDraftDescription(nextDescription);
+      setIsEditingDescription(false);
     } catch (error) {
       setDescriptionError(error instanceof Error ? error.message : "Failed to generate description");
+    } finally {
+      setDescriptionLoading(false);
+    }
+  };
+
+  const handleSaveDescription = async () => {
+    setDescriptionLoading(true);
+    setDescriptionError(null);
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}/youtube-description`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: draftDescription }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || "Failed to save description");
+      }
+
+      const nextDescription = result.description || "";
+      setDescription(nextDescription);
+      setDraftDescription(nextDescription);
+      setIsEditingDescription(false);
+    } catch (error) {
+      setDescriptionError(error instanceof Error ? error.message : "Failed to save description");
     } finally {
       setDescriptionLoading(false);
     }
@@ -220,24 +259,73 @@ export function TranscriptViewer({ asset, projectId }: TranscriptViewerProps) {
       <div className="border-t border-gray-700 pt-4 space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="text-md font-semibold text-white">Generate YouTube Description</h3>
-          <button
-            onClick={handleGenerateDescription}
-            disabled={descriptionLoading}
-            className="px-3 py-1 text-sm text-gray-400 hover:text-white transition-colors"
-          >
-            {descriptionLoading ? "Generating..." : description ? "Regenerate" : "Generate"}
-          </button>
+          <div className="flex items-center gap-3">
+            {isEditingDescription ? (
+              <>
+                <button
+                  onClick={handleSaveDescription}
+                  disabled={descriptionLoading}
+                  className="px-3 py-1 text-sm text-gray-400 hover:text-white transition-colors"
+                >
+                  {descriptionLoading ? "Saving..." : "Save"}
+                </button>
+                <button
+                  onClick={() => {
+                    setDraftDescription(description);
+                    setIsEditingDescription(false);
+                    setDescriptionError(null);
+                  }}
+                  disabled={descriptionLoading}
+                  className="px-3 py-1 text-sm text-gray-400 hover:text-white transition-colors"
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <>
+                {description && (
+                  <button
+                    onClick={() => {
+                      setDraftDescription(description);
+                      setIsEditingDescription(true);
+                      setDescriptionError(null);
+                    }}
+                    disabled={descriptionLoading}
+                    className="px-3 py-1 text-sm text-gray-400 hover:text-white transition-colors"
+                  >
+                    Edit
+                  </button>
+                )}
+                <button
+                  onClick={handleGenerateDescription}
+                  disabled={descriptionLoading}
+                  className="px-3 py-1 text-sm text-gray-400 hover:text-white transition-colors"
+                >
+                  {descriptionLoading ? "Generating..." : description ? "Regenerate" : "Generate"}
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
         {descriptionError && (
           <p className="text-red-400 text-sm">{descriptionError}</p>
         )}
 
-        {description ? (
+        {description || isEditingDescription ? (
           <div className="bg-gray-900 rounded-lg p-4">
-            <p className="text-gray-300 whitespace-pre-wrap leading-relaxed">
-              {description}
-            </p>
+            {isEditingDescription ? (
+              <textarea
+                value={draftDescription}
+                onChange={(event) => setDraftDescription(event.target.value)}
+                rows={6}
+                className="w-full bg-transparent text-gray-300 text-sm leading-relaxed outline-none resize-y"
+              />
+            ) : (
+              <p className="text-gray-300 whitespace-pre-wrap leading-relaxed">
+                {description}
+              </p>
+            )}
           </div>
         ) : (
           <p className="text-gray-500 text-sm">
@@ -245,7 +333,7 @@ export function TranscriptViewer({ asset, projectId }: TranscriptViewerProps) {
           </p>
         )}
 
-        {description && (
+        {description && !isEditingDescription && (
           <button
             onClick={() => {
               navigator.clipboard.writeText(description);
