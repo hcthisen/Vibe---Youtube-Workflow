@@ -1,7 +1,7 @@
 """
 LLM Cuts Analyzer - Use LLM to analyze retake markers and generate cut instructions.
 
-This module uses OpenAI GPT-4.1 to intelligently analyze video transcripts with retake markers
+This module uses OpenAI GPT-5.2 to intelligently analyze video transcripts with retake markers
 and determine optimal cut points for video editing. It handles variable-length retake sessions,
 from quick 2-3 second mistakes to long 30+ second false starts.
 
@@ -45,15 +45,15 @@ PATTERN_MIN_LOOKBACK_SECONDS = {
 }
 
 MODEL_ALIASES = {
-    "gpt-4": "gpt-4.1",
-    "gpt-4-turbo": "gpt-4.1-mini",
-    "gpt-4o": "gpt-4.1",
+    "gpt-4": "gpt-5.2",
+    "gpt-4-turbo": "gpt-5.2",
+    "gpt-4o": "gpt-5.2",
     "gpt-5": "gpt-5.2",
 }
 
 
 def normalize_llm_model(model: str) -> str:
-    """Normalize legacy model names to the current GPT-4.1 family."""
+    """Normalize legacy model names to the current supported defaults."""
     return MODEL_ALIASES.get(model, model)
 
 
@@ -329,7 +329,7 @@ def analyze_retake_cuts(
     context_window_seconds: float = DEFAULT_CONTEXT_WINDOW_SECONDS,
     min_confidence: float = DEFAULT_MIN_CONFIDENCE,
     prefer_sentence_boundaries: bool = True,
-    model: str = "gpt-4.1",
+    model: str = "gpt-5.2",
     vad_segments: Optional[List[Tuple[float, float]]] = None
 ) -> List[Dict]:
     """
@@ -346,7 +346,7 @@ def analyze_retake_cuts(
         context_window_seconds: Size of context window around markers (default: 30s)
         min_confidence: Minimum confidence score to accept cuts (default: 0.7)
         prefer_sentence_boundaries: Use sentence boundaries for natural cuts (default: True)
-        model: OpenAI model to use (default: "gpt-4.1")
+        model: OpenAI model to use (default: "gpt-5.2")
         vad_segments: Optional VAD speech segments for better boundary detection
     
     Returns:

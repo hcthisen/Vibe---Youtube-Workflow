@@ -17,7 +17,6 @@ interface ProfileFormProps {
     retake_context_window_seconds: number;
     retake_min_confidence: number;
     retake_prefer_sentence_boundaries: boolean;
-    llm_model: string;
   } | null;
   userId: string;
 }
@@ -38,7 +37,6 @@ export function ProfileForm({ profile, userId }: ProfileFormProps) {
     retake_context_window_seconds: profile?.retake_context_window_seconds || 30,
     retake_min_confidence: profile?.retake_min_confidence || 0.7,
     retake_prefer_sentence_boundaries: profile?.retake_prefer_sentence_boundaries ?? true,
-    llm_model: profile?.llm_model || "gpt-4.1",
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -65,7 +63,6 @@ export function ProfileForm({ profile, userId }: ProfileFormProps) {
       retake_context_window_seconds: formData.retake_context_window_seconds,
       retake_min_confidence: formData.retake_min_confidence,
       retake_prefer_sentence_boundaries: formData.retake_prefer_sentence_boundaries,
-      llm_model: formData.llm_model,
     });
 
     setSaving(false);
@@ -215,23 +212,6 @@ export function ProfileForm({ profile, userId }: ProfileFormProps) {
                   Required confidence score (0.0-1.0) to accept AI cuts
                 </p>
               </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                AI Model
-              </label>
-              <select
-                value={formData.llm_model}
-                onChange={(e) => setFormData({ ...formData, llm_model: e.target.value })}
-                className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors"
-              >
-                <option value="gpt-4.1">GPT-4.1 (Recommended)</option>
-                <option value="gpt-4.1-mini">GPT-4.1 Mini (Faster)</option>
-              </select>
-              <p className="mt-1 text-sm text-gray-500">
-                OpenAI model for analyzing retake markers
-              </p>
             </div>
 
             <div className="flex items-center gap-3">

@@ -69,8 +69,9 @@ DATABASE_URL=postgresql://postgres:password@host:5432/postgres
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
-# OpenAI (for transcription and LLM cuts)
+# OpenAI (for LLM cuts)
 OPENAI_API_KEY=sk-...
+OPENAI_MODEL=gpt-5.2
 
 # Optional: Worker configuration
 WORKER_CHECK_INTERVAL=5  # seconds between job checks
@@ -154,7 +155,7 @@ Detects retake phrases (e.g., "cut cut", "oops") and uses AI to intelligently re
 When recording videos, speakers often make mistakes and say a retake phrase to signal they want to redo that part. This feature:
 
 1. **Searches** transcript for user-configured retake marker phrases
-2. **Analyzes** surrounding context using GPT-4.1 to understand what went wrong
+2. **Analyzes** surrounding context using GPT-5.2 to understand what went wrong
 3. **Determines** optimal cut points (handles 2-second mistakes to 30+ second false starts)
 4. **Applies** cuts via FFmpeg and updates the transcript
 
@@ -196,7 +197,6 @@ Users configure retake detection in their profile settings:
 | `retake_context_window_seconds` | number | `30` | 10-120 | Pattern-detection window (LLM uses full transcript) |
 | `retake_min_confidence` | number | `0.7` | 0.0-1.0 | Minimum confidence to accept LLM cuts |
 | `retake_prefer_sentence_boundaries` | boolean | `true` | - | Prefer natural sentence boundaries |
-| `llm_model` | string | `gpt-5.2` | gpt-5.2, gpt-4.1 | OpenAI model for analysis |
 
 #### How It Works
 
@@ -227,7 +227,7 @@ pattern = detect_retake_pattern(context_words, match, transcript_words)
 
 **Step 4: LLM Analysis**
 ```python
-# Send context to GPT-4.1 with reasoning prompt
+# Send context to GPT-5.2 with reasoning prompt
 cut_instructions = analyze_retake_cuts(
     transcript_words=transcript_words,
     retake_matches=retake_matches,
@@ -235,7 +235,7 @@ cut_instructions = analyze_retake_cuts(
     context_window_seconds=30,
     min_confidence=0.7,
     prefer_sentence_boundaries=True,
-    model="gpt-4.1",
+    model="gpt-5.2",
     vad_segments=speech_segments
 )
 ```
@@ -335,7 +335,7 @@ Each processed video includes detailed retake analysis in the edit report:
     }
   ],
   "retake_analysis_settings": {
-    "llm_model": "gpt-4.1",
+    "llm_model": "gpt-5.2",
     "context_window_seconds": 30,
     "min_confidence": 0.7,
     "prefer_sentence_boundaries": true
@@ -374,9 +374,9 @@ Fallback cuts are marked with:
 #### Performance & Cost
 
 - **LLM Analysis Time**: 2-5 seconds per retake marker
-- **API Cost**: ~$0.01-0.03 per video (typical 2-3 retakes, GPT-4.1)
+- **API Cost**: Depends on usage volume and model pricing.
 - **Fallback Time**: < 0.1 seconds (instant)
-- **Recommended**: Use `gpt-4.1-mini` for faster, lower-cost runs
+- **Recommended**: Use `gpt-5.2` for best context understanding
 
 #### Troubleshooting
 
@@ -386,7 +386,7 @@ Fallback cuts are marked with:
 - Increase `retake_min_confidence` to 0.8-0.9
 - Enable `retake_prefer_sentence_boundaries`
 - Review `llm_reasoning` in edit report
-- Use `gpt-4.1` for better context understanding
+- Use `gpt-5.2` for better context understanding
 
 ---
 
@@ -405,7 +405,7 @@ Fallback cuts are marked with:
 **Solutions**:
 - Verify `OPENAI_API_KEY` is set in environment
 - Check OpenAI API usage limits
-- Verify model availability (gpt-4.1, gpt-4.1-mini)
+- Verify model availability (gpt-5.2)
 - Review worker logs: `tail -f worker.log`
 - Fallback heuristics will still work
 
@@ -433,7 +433,7 @@ Fallback cuts are marked with:
 
 **Dependencies**:
 ```python
-from openai import OpenAI  # GPT-4.1 API
+from openai import OpenAI  # GPT-5.2 API
 import json, re, time      # Parsing and retries
 ```
 

@@ -170,11 +170,15 @@ export async function projectGenerateOutlineHandler(
 
     const idea = project.ideas as { ai_summary?: string; title_variants?: string[] } | null;
 
-    // Build context from idea summary and brief
+    // Build context from idea brief and summary
     let contextParts: string[] = [];
+    if (project.idea_brief_markdown) {
+      contextParts.push(`Idea Brief:\n${project.idea_brief_markdown}`);
+    }
     if (input.context) contextParts.push(input.context);
-    if (idea?.ai_summary) contextParts.push(`Summary: ${idea.ai_summary}`);
-    if (project.idea_brief_markdown) contextParts.push(`Idea Brief: ${project.idea_brief_markdown}`);
+    if (idea?.ai_summary) {
+      contextParts.push(`Summary: ${idea.ai_summary}`);
+    }
 
     // If no context, use empty string
     const outlineContext = contextParts.join("\n\n");

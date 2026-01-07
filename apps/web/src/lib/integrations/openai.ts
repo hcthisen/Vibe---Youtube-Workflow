@@ -71,11 +71,20 @@ interface GenerateSummaryResult {
   error?: string;
 }
 
+interface GenerateYouTubeDescriptionParams {
+  transcript: string;
+}
+
+interface GenerateYouTubeDescriptionResult {
+  success: boolean;
+  description: string;
+  error?: string;
+}
+
 class OpenAIClient {
   private baseUrl = "https://api.openai.com/v1";
   private apiKey: string;
-  private defaultModel: string;
-  private fastModel: string;
+  private model: string;
 
   constructor() {
     const apiKey = process.env.OPENAI_API_KEY;
@@ -84,15 +93,14 @@ class OpenAIClient {
     }
 
     this.apiKey = apiKey;
-    this.defaultModel = process.env.OPENAI_MODEL_DEFAULT || "gpt-5.2";
-    this.fastModel = process.env.OPENAI_MODEL_FAST || "gpt-5-mini";
+    this.model = process.env.OPENAI_MODEL || "gpt-5.2";
   }
 
   private async chat(
     messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
     options: { model?: string; temperature?: number; maxTokens?: number } = {}
   ): Promise<string> {
-    const model = options.model || this.defaultModel;
+    const model = options.model || this.model;
     const isGPT5 = model.startsWith("gpt-5");
 
     if (isGPT5) {
@@ -123,9 +131,10 @@ class OpenAIClient {
             verbosity: "low", // Minimize extra text
           },
           reasoning: {
-            effort: "low", // Fast reasoning for simple tasks
-            summary: "auto", // Auto-select reasoning summary (concise, detailed, or auto)
+            effort: "medium",
+            summary: "auto",
           },
+          max_output_tokens: options.maxTokens ?? 4096,
         }),
       });
 
@@ -135,7 +144,7 @@ class OpenAIClient {
       }
 
       const data = await response.json();
-      return data.output?.[0]?.content?.[0]?.text || "";
+      return data.output?.[0]?.content?.[0]?.text || data.output_text || "";
     } else {
       // Use legacy GPT-4 API (chat completions endpoint)
       const response = await fetch(`${this.baseUrl}/chat/completions`, {
@@ -253,6 +262,8 @@ ${params.context}
 
 ${params.existingHooks.length > 0 ? `Existing hook ideas to consider: ${params.existingHooks.join(", ")}` : ""}
 
+Use the Idea Brief section (if present in the context) as your primary source of truth.
+
 The outline should follow this exact format:
 2-3 Different opening hooks
 Bullet pointed list of things to cover
@@ -324,7 +335,7 @@ Respond with JSON: { "title_variants": [...] }`;
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        { model: this.fastModel, temperature: 0.8 }
+        { temperature: 0.8 }
       );
 
       const parsed = this.parseJsonResponse<{ title_variants: TitleVariant[] }>(response);
@@ -374,13 +385,12 @@ Based on the video titles and transcripts above, provide:
 Respond with ONLY this exact JSON structure:
 {"summary": "your summary here", "keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"]}`;
 
-      // Use GPT-4 for more reliable JSON output (GPT-5 is still experimental)
       const response = await this.chat(
         [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        { model: "gpt-4o", temperature: 0.3, maxTokens: 1000 }
+        { temperature: 0.3, maxTokens: 1200 }
       );
 
       const parsed = this.parseJsonResponse<{ summary: string; keywords: string[] }>(response);
@@ -400,6 +410,49 @@ Respond with ONLY this exact JSON structure:
         success: false,
         summary: "",
         keywords: [],
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  }
+
+  async generateYouTubeDescription(
+    params: GenerateYouTubeDescriptionParams
+  ): Promise<GenerateYouTubeDescriptionResult> {
+    try {
+      const systemPrompt = `You are a YouTube copywriter. Write a short, natural description based on the transcript.
+You must respond with valid JSON only.`;
+
+      const userPrompt = `Write a concise YouTube description based on this transcript.
+
+Constraints:
+- 3-5 short paragraphs
+- Keep it punchy and personal
+- Do not add hashtags
+- Do not invent links or credits unless explicitly stated in the transcript
+
+Transcript:
+${params.transcript}
+
+Respond with JSON: { "description": "..." }`;
+
+      const response = await this.chat(
+        [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        { temperature: 0.6, maxTokens: 1200 }
+      );
+
+      const parsed = this.parseJsonResponse<{ description: string }>(response);
+
+      return {
+        success: true,
+        description: parsed.description || "",
+      };
+    } catch (error) {
+      return {
+        success: false,
+        description: "",
         error: error instanceof Error ? error.message : "Unknown error",
       };
     }

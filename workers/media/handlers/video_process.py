@@ -46,8 +46,7 @@ class VideoProcessHandler(BaseHandler):
             retake_context_window = input_data.get("retake_context_window_seconds", 30)
             retake_min_confidence = input_data.get("retake_min_confidence", 0.7)
             retake_prefer_sentence_boundaries = input_data.get("retake_prefer_sentence_boundaries", True)
-            llm_model = input_data.get("llm_model", "gpt-5.2")
-            llm_model = normalize_llm_model(llm_model)
+            llm_model = normalize_llm_model(os.getenv("OPENAI_MODEL", "gpt-5.2"))
 
             logger.info(f"Starting video processing pipeline for asset {asset_id}")
 

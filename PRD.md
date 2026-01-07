@@ -237,7 +237,7 @@ Core steps:
 4. **LLM-Based Retake Detection** (if retake markers configured):
    - Search transcript for user-configured phrases (e.g., "cut cut", "oops")
    - Extract context windows (default: 30s) around each marker
-   - Send to GPT-4.1 with reasoning prompts
+   - Send to GPT-5.2 with reasoning prompts
    - LLM analyzes context and returns optimal cut points with confidence scores
    - Handles variable-length mistakes (2 seconds to 30+ seconds)
    - Pattern recognition: quick fix, full redo, multiple attempts
@@ -258,7 +258,7 @@ Core steps:
 - `retake_context_window_seconds`: Context size for LLM (default: 30, range: 10-120)
 - `retake_min_confidence`: Minimum confidence score (default: 0.7, range: 0.0-1.0)
 - `retake_prefer_sentence_boundaries`: Use natural cut points (default: true)
-- `llm_model`: OpenAI model to use (default: "gpt-4.1", options: gpt-4.1, gpt-4.1-mini)
+- OpenAI model is set globally via `OPENAI_MODEL` (default: `gpt-5.2`)
 
 **LLM Analysis Flow**:
 ```
@@ -297,7 +297,7 @@ If LLM analysis fails or returns low confidence:
     }
   ],
   "retake_analysis_settings": {
-    "llm_model": "gpt-4.1",
+    "llm_model": "gpt-5.2",
     "context_window_seconds": 30,
     "min_confidence": 0.7
   },
@@ -320,7 +320,7 @@ If LLM analysis fails or returns low confidence:
 **Dependencies**:
 - FFmpeg (video processing)
 - OpenAI Whisper (transcription)
-- OpenAI API (GPT-4.1 for retake analysis)
+- OpenAI API (GPT-5.2 for retake analysis)
 - Silero VAD (voice activity detection)
 - Remotion + Node.js (intro transitions, optional)
 
@@ -550,8 +550,7 @@ DataForSEO:
 
 OpenAI (LLM):
 - `OPENAI_API_KEY`
-- `OPENAI_MODEL_DEFAULT` (example: `gpt-5.2`)
-- `OPENAI_MODEL_FAST` (example: `gpt-5.1-nano`)
+- `OPENAI_MODEL` (example: `gpt-5.2`)
 
 Nano Banana Pro (images via Google AI Studio key):
 - `GOOGLE_AI_STUDIO_API_KEY`

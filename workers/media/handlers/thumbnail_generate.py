@@ -7,7 +7,6 @@ import re
 from typing import Dict, Any, List, Optional
 import requests
 from supabase import Client
-from openai import OpenAI
 from .base import BaseHandler
 
 logger = logging.getLogger(__name__)
@@ -227,26 +226,53 @@ class ThumbnailGenerateHandler(BaseHandler):
         if not api_key:
             raise ValueError("OPENAI_API_KEY not found")
         
-        client = OpenAI(api_key=api_key)
-        
         system_prompt = (
             "You are a visual design assistant. Summarize the following project brief "
             "into a concise description (max 200 words) focusing ONLY on visual elements, "
             "key themes, and text ideas suitable for a YouTube thumbnail. "
             "Discard technical implementation details."
         )
-        
-        response = client.chat.completions.create(
-            model=os.getenv("OPENAI_MODEL", "gpt-4o"),
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": text}
+
+        model = os.getenv("OPENAI_MODEL", "gpt-5.2")
+        payload = {
+            "model": model,
+            "input": [
+                {
+                    "role": "developer",
+                    "content": [{"type": "input_text", "text": system_prompt}],
+                },
+                {"role": "user", "content": [{"type": "input_text", "text": text}]},
             ],
-            temperature=0.3,
-            max_tokens=500
+            "temperature": 0.3,
+            "max_output_tokens": 600,
+        }
+
+        response = requests.post(
+            "https://api.openai.com/v1/responses",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json=payload,
+            timeout=60
         )
-        
-        return response.choices[0].message.content.strip()
+
+        if response.status_code >= 400:
+            raise ValueError(f"OpenAI API error: {response.status_code} {response.text}")
+
+        data = response.json()
+        if isinstance(data, dict) and data.get("output_text"):
+            return data["output_text"].strip()
+
+        output = data.get("output", []) if isinstance(data, dict) else []
+        text_chunks = []
+        for item in output:
+            for content in item.get("content", []):
+                chunk = content.get("text")
+                if chunk:
+                    text_chunks.append(chunk)
+
+        return "\n".join(text_chunks).strip()
 
     def download_from_storage(self, bucket: str, path: str) -> Optional[bytes]:
         """Download a file from Supabase storage"""

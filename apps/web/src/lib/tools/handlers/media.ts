@@ -63,7 +63,7 @@ export async function videoUploadFinalizeHandler(
       .select(
         "silence_threshold_ms, retake_markers, intro_transition_enabled, " +
         "retake_detection_enabled, retake_context_window_seconds, retake_min_confidence, " +
-        "retake_prefer_sentence_boundaries, llm_model"
+        "retake_prefer_sentence_boundaries"
       )
       .eq("id", context.userId)
       .single();
@@ -76,7 +76,6 @@ export async function videoUploadFinalizeHandler(
           retake_context_window_seconds: number;
           retake_min_confidence: number;
           retake_prefer_sentence_boundaries: boolean;
-          llm_model: string;
         }
       | null;
 
@@ -97,7 +96,6 @@ export async function videoUploadFinalizeHandler(
           retake_context_window_seconds: profile?.retake_context_window_seconds || 30,
           retake_min_confidence: profile?.retake_min_confidence || 0.7,
           retake_prefer_sentence_boundaries: profile?.retake_prefer_sentence_boundaries ?? true,
-          llm_model: profile?.llm_model || "gpt-4.1",
         } as any,
       })
       .select()

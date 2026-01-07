@@ -53,8 +53,7 @@ DATAFORSEO_PASSWORD=your-password
 
 # OpenAI
 OPENAI_API_KEY=sk-...
-OPENAI_MODEL_DEFAULT=gpt-5.2
-OPENAI_MODEL_FAST=gpt-5-mini
+OPENAI_MODEL=gpt-5.2
 
 # Google AI Studio (Nano Banana Pro)
 GOOGLE_AI_STUDIO_API_KEY=your-google-ai-key

@@ -30,12 +30,16 @@ interface WordLevelTranscript {
 
 interface TranscriptViewerProps {
   asset: Asset;
+  projectId: string;
 }
 
-export function TranscriptViewer({ asset }: TranscriptViewerProps) {
+export function TranscriptViewer({ asset, projectId }: TranscriptViewerProps) {
   const [transcript, setTranscript] = useState<Transcript | null>(null);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<"full" | "segments">("full");
+  const [description, setDescription] = useState<string>("");
+  const [descriptionLoading, setDescriptionLoading] = useState(false);
+  const [descriptionError, setDescriptionError] = useState<string | null>(null);
 
   const supabase = createClient();
 
@@ -128,6 +132,31 @@ export function TranscriptViewer({ asset }: TranscriptViewerProps) {
     );
   }
 
+  const handleGenerateDescription = async () => {
+    setDescriptionLoading(true);
+    setDescriptionError(null);
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}/youtube-description`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transcript: transcript.full_text }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || "Failed to generate description");
+      }
+
+      setDescription(result.description || "");
+    } catch (error) {
+      setDescriptionError(error instanceof Error ? error.message : "Failed to generate description");
+    } finally {
+      setDescriptionLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -187,6 +216,46 @@ export function TranscriptViewer({ asset }: TranscriptViewerProps) {
       >
         Copy transcript
       </button>
+
+      <div className="border-t border-gray-700 pt-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-md font-semibold text-white">Generate YouTube Description</h3>
+          <button
+            onClick={handleGenerateDescription}
+            disabled={descriptionLoading}
+            className="px-3 py-1 text-sm text-gray-400 hover:text-white transition-colors"
+          >
+            {descriptionLoading ? "Generating..." : description ? "Regenerate" : "Generate"}
+          </button>
+        </div>
+
+        {descriptionError && (
+          <p className="text-red-400 text-sm">{descriptionError}</p>
+        )}
+
+        {description ? (
+          <div className="bg-gray-900 rounded-lg p-4">
+            <p className="text-gray-300 whitespace-pre-wrap leading-relaxed">
+              {description}
+            </p>
+          </div>
+        ) : (
+          <p className="text-gray-500 text-sm">
+            Generate a short YouTube description based on the transcript.
+          </p>
+        )}
+
+        {description && (
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(description);
+            }}
+            className="text-sm text-gray-400 hover:text-white transition-colors"
+          >
+            Copy description
+          </button>
+        )}
+      </div>
     </div>
   );
 }
