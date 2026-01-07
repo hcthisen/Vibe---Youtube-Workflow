@@ -93,7 +93,7 @@ print()
 print("5. Verifying FFmpeg overlay command structure...")
 
 # Look for the overlay command pattern
-if '[0:v][1:v]overlay=' in source:
+if '[0:v][1:v]overlay=' in source or '[0:v][transition]overlay=' in source:
     print("   ✅ Correct overlay filter syntax")
 else:
     print("   ❌ Overlay filter not found or incorrect")
@@ -103,6 +103,12 @@ if "enable='between(t," in source:
     print("   ✅ Correct time-based overlay enable syntax")
 else:
     print("   ❌ Time-based overlay not found")
+    all_passed = False
+
+if "setpts=PTS-STARTPTS" in source:
+    print("   ✅ Transition timestamp offset applied")
+else:
+    print("   ❌ Transition timestamp offset missing")
     all_passed = False
 
 if '"-map", "[v]"' in source and '"-map", "0:a"' in source:

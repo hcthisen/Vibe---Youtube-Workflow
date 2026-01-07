@@ -333,12 +333,17 @@ def add_intro_transition(
             logger.info("Using software encoding (libx264)")
         
         # Build FFmpeg command
+        filter_complex = (
+            f"[1:v]setpts=PTS-STARTPTS+{insert_at}/TB[transition];"
+            f"[0:v][transition]overlay=enable='between(t,{insert_at},{overlay_end})'"
+            f":eof_action=pass:x=0:y=0[v]"
+        )
         cmd = [
             "ffmpeg", "-y",
             "-i", input_path,           # [0] = original video
             "-i", transition_path,       # [1] = transition video
             "-filter_complex",
-            f"[0:v][1:v]overlay=enable='between(t,{insert_at},{overlay_end})':x=0:y=0[v]",
+            filter_complex,
             "-map", "[v]",              # Use the overlaid video
             "-map", "0:a",              # Use original audio
             "-c:a", "copy",             # Copy audio without re-encoding
