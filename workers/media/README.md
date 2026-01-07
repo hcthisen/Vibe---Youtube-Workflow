@@ -196,7 +196,7 @@ Users configure retake detection in their profile settings:
 | `retake_context_window_seconds` | number | `30` | 10-120 | Pattern-detection window (LLM uses full transcript) |
 | `retake_min_confidence` | number | `0.7` | 0.0-1.0 | Minimum confidence to accept LLM cuts |
 | `retake_prefer_sentence_boundaries` | boolean | `true` | - | Prefer natural sentence boundaries |
-| `llm_model` | string | `gpt-4.1` | gpt-4.1, gpt-4.1-mini | OpenAI model for analysis |
+| `llm_model` | string | `gpt-5.2` | gpt-5.2, gpt-4.1 | OpenAI model for analysis |
 
 #### How It Works
 
