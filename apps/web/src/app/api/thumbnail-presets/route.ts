@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
+export const runtime = "nodejs";
+
 const MAX_PRESETS = 5;
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 
