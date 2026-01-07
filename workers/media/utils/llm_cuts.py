@@ -23,6 +23,7 @@ import logging
 import json
 import re
 import time
+import requests
 from typing import List, Dict, Optional, Tuple
 from openai import OpenAI
 
@@ -274,6 +275,53 @@ def _use_responses_api(model: str) -> bool:
     return model.startswith("gpt-5")
 
 
+def _call_responses_api(
+    model: str,
+    api_key: str,
+    prompt: str,
+    temperature: float,
+    max_output_tokens: int
+) -> str:
+    url = "https://api.openai.com/v1/responses"
+    payload = {
+        "model": model,
+        "input": [
+            {
+                "role": "system",
+                "content": (
+                    "You are an expert video editing assistant. "
+                    "Return JSON only with a precise mistake_start_time."
+                ),
+            },
+            {"role": "user", "content": prompt},
+        ],
+        "temperature": temperature,
+        "max_output_tokens": max_output_tokens,
+        "response_format": {"type": "json_object"},
+    }
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+
+    response = requests.post(url, json=payload, headers=headers, timeout=60)
+    if response.status_code >= 400:
+        raise RuntimeError(f"Responses API error ({response.status_code}): {response.text}")
+
+    data = response.json()
+    if isinstance(data, dict) and data.get("output_text"):
+        return data["output_text"]
+
+    output = data.get("output", []) if isinstance(data, dict) else []
+    text_chunks = []
+    for item in output:
+        for content in item.get("content", []):
+            text = content.get("text")
+            if text:
+                text_chunks.append(text)
+    return "\n".join(text_chunks).strip()
+
+
 def analyze_retake_cuts(
     transcript_words: List[Dict],
     retake_matches: List[Dict],
@@ -324,7 +372,7 @@ def analyze_retake_cuts(
         f"{context_window_seconds}s, Min confidence: {min_confidence}"
     )
 
-    client = OpenAI(api_key=api_key)
+    client = None if _use_responses_api(model) else OpenAI(api_key=api_key)
 
     # Pre-compute sentence boundaries for natural cuts
     sentence_boundaries = []
@@ -438,6 +486,7 @@ Return JSON only:
                 client,
                 model,
                 prompt,
+                api_key=api_key,
                 max_retries=DEFAULT_MAX_RETRIES
             )
             mistake_start = float(result.get("mistake_start_time"))
@@ -516,9 +565,10 @@ Return JSON only:
 
 
 def _call_llm_for_cluster(
-    client: OpenAI,
+    client: Optional[OpenAI],
     model: str,
     prompt: str,
+    api_key: str,
     max_retries: int = DEFAULT_MAX_RETRIES
 ) -> Dict:
     """
@@ -529,28 +579,14 @@ def _call_llm_for_cluster(
     for attempt in range(max_retries):
         try:
             if _use_responses_api(model):
-                response = client.responses.create(
+                response = _call_responses_api(
                     model=model,
-                    input=[
-                        {
-                            "role": "system",
-                            "content": (
-                                "You are an expert video editing assistant. "
-                                "Return JSON only with a precise mistake_start_time."
-                            )
-                        },
-                        {"role": "user", "content": prompt}
-                    ],
+                    api_key=api_key,
+                    prompt=prompt,
                     temperature=0.2,
-                    max_output_tokens=1200,
-                    response_format={"type": "json_object"}
+                    max_output_tokens=1200
                 )
-                result_text = getattr(response, "output_text", "") or ""
-                if not result_text:
-                    try:
-                        result_text = response.output[0].content[0].text
-                    except Exception:
-                        result_text = ""
+                result_text = response
             else:
                 response = client.chat.completions.create(
                     model=model,
