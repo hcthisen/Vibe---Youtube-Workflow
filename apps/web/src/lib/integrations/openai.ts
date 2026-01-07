@@ -113,7 +113,16 @@ class OpenAIClient {
 
   private async chat(
     messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
-    options: { model?: string; temperature?: number; maxTokens?: number } = {}
+    options: {
+      model?: string;
+      temperature?: number;
+      maxTokens?: number;
+      responseJsonSchema?: {
+        name: string;
+        schema: Record<string, unknown>;
+        strict?: boolean;
+      };
+    } = {}
   ): Promise<string> {
     const model = options.model || this.model;
     const isGPT5 = model.startsWith("gpt-5");
@@ -141,7 +150,16 @@ class OpenAIClient {
           input,
           text: {
             format: {
-              type: "json_object", // Request JSON output
+              type: options.responseJsonSchema ? "json_schema" : "json_object",
+              ...(options.responseJsonSchema
+                ? {
+                    json_schema: {
+                      name: options.responseJsonSchema.name,
+                      schema: options.responseJsonSchema.schema,
+                      strict: options.responseJsonSchema.strict ?? true,
+                    },
+                  }
+                : {}),
             },
             verbosity: "low", // Minimize extra text
           },
@@ -249,7 +267,43 @@ Respond with a JSON object: { "ideas": [...] }`;
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        { temperature: 0.8 }
+        {
+          temperature: 0.8,
+          maxTokens: Math.min(12000, Math.max(4096, params.count * 400)),
+          responseJsonSchema: {
+            name: "deep_research_ideas",
+            schema: {
+              type: "object",
+              additionalProperties: false,
+              required: ["ideas"],
+              properties: {
+                ideas: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    additionalProperties: false,
+                    required: [
+                      "title_concept",
+                      "thesis",
+                      "why_now",
+                      "hook_options",
+                      "thumbnail_text_ideas",
+                      "search_queries_used",
+                    ],
+                    properties: {
+                      title_concept: { type: "string" },
+                      thesis: { type: "string" },
+                      why_now: { type: "string" },
+                      hook_options: { type: "array", items: { type: "string" } },
+                      thumbnail_text_ideas: { type: "array", items: { type: "string" } },
+                      search_queries_used: { type: "array", items: { type: "string" } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        }
       );
 
       const parsed = this.parseJsonResponse<{ ideas: IdeaResult[] }>(response);
