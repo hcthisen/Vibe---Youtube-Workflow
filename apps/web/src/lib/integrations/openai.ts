@@ -153,11 +153,9 @@ class OpenAIClient {
               type: options.responseJsonSchema ? "json_schema" : "json_object",
               ...(options.responseJsonSchema
                 ? {
-                    json_schema: {
-                      name: options.responseJsonSchema.name,
-                      schema: options.responseJsonSchema.schema,
-                      strict: options.responseJsonSchema.strict ?? true,
-                    },
+                    name: options.responseJsonSchema.name,
+                    schema: options.responseJsonSchema.schema,
+                    strict: options.responseJsonSchema.strict ?? true,
                   }
                 : {}),
             },
