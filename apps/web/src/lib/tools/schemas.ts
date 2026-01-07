@@ -77,6 +77,14 @@ export const deepResearchOutputSchema = z.object({
   ),
 });
 
+export const ideaEnrichInputSchema = z.object({
+  idea_id: z.string().uuid(),
+});
+
+export const ideaEnrichOutputSchema = z.object({
+  idea_id: z.string().uuid(),
+});
+
 export const videoSubtitlesFetchInputSchema = z.object({
   youtube_video_id: z.string(),
 });
@@ -233,6 +241,8 @@ export type OutlierSearchInput = z.infer<typeof outlierSearchInputSchema>;
 export type OutlierSearchOutput = z.infer<typeof outlierSearchOutputSchema>;
 export type DeepResearchInput = z.infer<typeof deepResearchInputSchema>;
 export type DeepResearchOutput = z.infer<typeof deepResearchOutputSchema>;
+export type IdeaEnrichInput = z.infer<typeof ideaEnrichInputSchema>;
+export type IdeaEnrichOutput = z.infer<typeof ideaEnrichOutputSchema>;
 export type VideoSubtitlesFetchInput = z.infer<typeof videoSubtitlesFetchInputSchema>;
 export type VideoSubtitlesFetchOutput = z.infer<typeof videoSubtitlesFetchOutputSchema>;
 export type ProjectCreateFromIdeaInput = z.infer<typeof projectCreateFromIdeaInputSchema>;

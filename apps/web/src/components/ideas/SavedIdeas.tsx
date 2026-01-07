@@ -25,6 +25,7 @@ interface Idea {
   ai_summary: string | null;
   title_variants: unknown;
   hook_options: unknown;
+  why_now?: string | null;
   status: string;
   created_at: string;
   videos: Video | null;
@@ -119,28 +120,46 @@ export function SavedIdeas({ ideas }: SavedIdeasProps) {
 
             {/* Content */}
             <div className="flex-1 min-w-0">
-              <div className="flex items-start gap-2">
-                <h4 className="text-white font-medium line-clamp-2 flex-1">
-                  {idea.videos?.title || idea.ai_summary?.slice(0, 100) || "Untitled Idea"}
-                </h4>
-                {idea.status === "project_created" && (
-                  <span className="px-2 py-1 bg-accent-600/20 border border-accent-600/30 rounded text-xs text-accent-400 font-medium whitespace-nowrap">
-                    Project Created
-                  </span>
-                )}
-              </div>
-              {idea.videos?.channel_name && (
-                <p className="text-sm text-gray-400 mt-1">{idea.videos.channel_name}</p>
-              )}
-              {idea.ai_summary && (
-                <p className="text-sm text-gray-400 mt-2 line-clamp-2">{idea.ai_summary}</p>
-              )}
+              {(() => {
+                const rawSummary = idea.ai_summary || "";
+                const [titleLine, thesisLine] = rawSummary.split("\n\n");
+                const displayTitle = titleLine?.trim() || "Idea in progress";
+                const displaySummary = thesisLine?.trim();
+
+                return (
+                  <>
+                    <div className="flex items-start gap-2">
+                      <h4 className="text-white font-medium line-clamp-2 flex-1">
+                        {displayTitle}
+                      </h4>
+                      {idea.status === "project_created" && (
+                        <span className="px-2 py-1 bg-accent-600/20 border border-accent-600/30 rounded text-xs text-accent-400 font-medium whitespace-nowrap">
+                          Project Created
+                        </span>
+                      )}
+                    </div>
+                    {displaySummary ? (
+                      <p className="text-sm text-gray-400 mt-2 line-clamp-2">{displaySummary}</p>
+                    ) : (
+                      <p className="text-sm text-gray-500 mt-2">
+                        Generating your idea… this usually takes under a minute.
+                      </p>
+                    )}
+                  </>
+                );
+              })()}
               <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
-                {idea.videos?.views_count && (
-                  <span>{idea.videos.views_count.toLocaleString()} views</span>
+                {idea.why_now && (
+                  <span className="text-accent-400 line-clamp-1">Why now: {idea.why_now}</span>
                 )}
                 <span>Saved {new Date(idea.created_at).toLocaleDateString()}</span>
               </div>
+              {idea.videos?.title && (
+                <p className="text-xs text-gray-500 mt-2 line-clamp-1">
+                  Source video: {idea.videos.title}
+                  {idea.videos.channel_name ? ` · ${idea.videos.channel_name}` : ""}
+                </p>
+              )}
             </div>
 
             {/* Score */}

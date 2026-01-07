@@ -302,25 +302,36 @@ export async function deepResearchHandler(
 
     logs.push(`Using baseline context: ${baselineContext.slice(0, 100)}...`);
 
-    const result = await getOpenAIClient().generateIdeas({
-      baselineContext,
-      baselineKeywords,
-      avoidTopics: input.avoid_topics || [],
-      targetViewer: input.target_viewer_description,
-      focusTopic: input.focus_topic,
-      count: input.idea_count || 20,
-    });
+    const totalCount = input.idea_count || 20;
+    const batchSize = totalCount > 10 ? 10 : totalCount;
+    const ideas: DeepResearchOutput["ideas"] = [];
 
-    if (!result.success) {
-      return { success: false, error: result.error, logs };
+    for (let offset = 0; offset < totalCount; offset += batchSize) {
+      const count = Math.min(batchSize, totalCount - offset);
+      const result = await getOpenAIClient().generateIdeas({
+        baselineContext,
+        baselineKeywords,
+        avoidTopics: input.avoid_topics || [],
+        targetViewer: input.target_viewer_description,
+        focusTopic: input.focus_topic,
+        count,
+      });
+
+      if (!result.success) {
+        return { success: false, error: result.error, logs };
+      }
+
+      ideas.push(...result.ideas);
+      logs.push(`Generated ${result.ideas.length} ideas (batch ${offset / batchSize + 1})`);
     }
 
-    logs.push(`Generated ${result.ideas.length} ideas`);
+    const finalIdeas = ideas.slice(0, totalCount);
+    logs.push(`Generated ${finalIdeas.length} ideas total`);
 
     return {
       success: true,
       data: {
-        ideas: result.ideas,
+        ideas: finalIdeas,
       },
       logs,
     };

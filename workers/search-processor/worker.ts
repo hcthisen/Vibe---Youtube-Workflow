@@ -141,49 +141,67 @@ async function processJob(job: Job): Promise<void> {
     console.log(`   ✅ Tool executed successfully`);
 
     // For search tools, result.data should contain the search results
-    // Save to search_results table
-    const searchParams = job.input;
-    const searchResults = job.type === "outlier_search" 
-      ? result.data.results 
-      : result.data.ideas;
+    const isSearchJob = job.type === "outlier_search" || job.type === "deep_research";
 
-    const { data: searchResult, error: saveError } = await supabase
-      .from("search_results")
-      .insert({
-        user_id: job.user_id,
-        search_type: job.type,
-        search_params: searchParams,
-        results: searchResults,
-        results_count: searchResults?.length || 0,
-      })
-      .select()
-      .single();
+    if (isSearchJob) {
+      // Save to search_results table
+      const searchParams = job.input;
+      const searchResults = job.type === "outlier_search"
+        ? result.data.results
+        : result.data.ideas;
 
-    if (saveError || !searchResult) {
-      throw new Error(`Failed to save search results: ${saveError?.message}`);
-    }
-
-    console.log(`   💾 Saved ${searchResults?.length || 0} results to search_results table`);
-
-    // Update job with success status
-    const { error: successError } = await supabase
-      .from("jobs")
-      .update({
-        status: "succeeded",
-        output: {
-          search_result_id: searchResult.id,
+      const { data: searchResult, error: saveError } = await supabase
+        .from("search_results")
+        .insert({
+          user_id: job.user_id,
+          search_type: job.type,
+          search_params: searchParams,
+          results: searchResults,
           results_count: searchResults?.length || 0,
-        },
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", job.id);
+        })
+        .select()
+        .single();
 
-    if (successError) {
-      console.error(`   ⚠️  Warning: Job succeeded but failed to update status:`, successError);
+      if (saveError || !searchResult) {
+        throw new Error(`Failed to save search results: ${saveError?.message}`);
+      }
+
+      console.log(`   ? Saved ${searchResults?.length || 0} results to search_results table`);
+
+      // Update job with success status
+      const { error: successError } = await supabase
+        .from("jobs")
+        .update({
+          status: "succeeded",
+          output: {
+            search_result_id: searchResult.id,
+            results_count: searchResults?.length || 0,
+          },
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", job.id);
+
+      if (successError) {
+        console.error(`   ??  Warning: Job succeeded but failed to update status:`, successError);
+      } else {
+        console.log(`   ? Job completed successfully`);
+      }
     } else {
-      console.log(`   ✅ Job completed successfully`);
-    }
+      const { error: successError } = await supabase
+        .from("jobs")
+        .update({
+          status: "succeeded",
+          output: result.data || {},
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", job.id);
 
+      if (successError) {
+        console.error(`   ??  Warning: Job succeeded but failed to update status:`, successError);
+      } else {
+        console.log(`   ? Job completed successfully`);
+      }
+    }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error(`   ❌ Job failed:`, errorMessage);
@@ -214,7 +232,7 @@ async function pollJobs(): Promise<void> {
       .from("jobs")
       .select("*")
       .eq("status", "search_queued")
-      .in("type", ["outlier_search", "deep_research"])
+      .in("type", ["outlier_search", "deep_research", "idea_enrich"])
       .order("created_at", { ascending: true })
       .limit(10);
 

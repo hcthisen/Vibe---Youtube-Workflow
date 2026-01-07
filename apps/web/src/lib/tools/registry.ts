@@ -57,6 +57,15 @@ export const toolRegistry: Record<string, ToolDefinition> = {
     handler: handlers.deepResearchHandler,
   },
 
+  idea_enrich: {
+    name: "idea_enrich",
+    version: "1.0.0",
+    description: "Enrich a saved idea with transcript + adapted hooks/summary",
+    inputSchema: schemas.ideaEnrichInputSchema,
+    outputSchema: schemas.ideaEnrichOutputSchema,
+    handler: handlers.ideaEnrichHandler,
+  },
+
   video_subtitles_fetch: {
     name: "video_subtitles_fetch",
     version: "1.0.0",

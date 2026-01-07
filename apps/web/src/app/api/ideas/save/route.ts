@@ -1,6 +1,4 @@
 import { createClient } from "@/lib/supabase/server";
-import { getDataForSeoClient } from "@/lib/integrations/dataforseo";
-import { getOpenAIClient } from "@/lib/integrations/openai";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
@@ -93,43 +91,6 @@ export async function POST(request: NextRequest) {
 
     const videoData = video.data;
 
-    let transcript: string | null = null;
-    let transcriptLanguage: string | null = null;
-
-    if (videoData.youtube_video_id) {
-      try {
-        const subtitles = await getDataForSeoClient().getVideoSubtitles(videoData.youtube_video_id);
-        if (subtitles.success) {
-          transcript = subtitles.transcript || null;
-          transcriptLanguage = subtitles.language || null;
-        }
-      } catch (subtitleError) {
-        console.error("Failed to fetch subtitles:", subtitleError);
-      }
-    }
-
-    let aiSummary: string | null = null;
-    let hookOptions: string[] = [];
-    let thumbnailTextIdeas: string[] = [];
-
-    if (videoData.title) {
-      try {
-        const ideaDetails = await getOpenAIClient().generateOutlierIdeaDetails({
-          title: videoData.title,
-          channelName: videoData.channel_name,
-          transcript,
-        });
-
-        if (ideaDetails.success) {
-          aiSummary = ideaDetails.summary || null;
-          hookOptions = ideaDetails.hook_options || [];
-          thumbnailTextIdeas = ideaDetails.thumbnail_text_ideas || [];
-        }
-      } catch (llmError) {
-        console.error("Outlier idea enrichment failed:", llmError);
-      }
-    }
-
     const { data: idea, error } = await supabase
       .from("ideas")
       .insert({
@@ -138,11 +99,6 @@ export async function POST(request: NextRequest) {
         search_result_id: search_result_id || null,
         score: score || 0,
         score_breakdown: score_breakdown || {},
-        ai_summary: aiSummary,
-        hook_options: hookOptions,
-        title_variants: thumbnailTextIdeas,
-        transcript,
-        transcript_language: transcriptLanguage,
         status: "saved",
       })
       .select()
@@ -152,7 +108,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error?.message || "Failed to save idea" }, { status: 500 });
     }
 
-    return NextResponse.json({ idea });
+    const ideaId = (idea as { id: string }).id;
+
+    const { data: job, error: jobError } = await supabase
+      .from("jobs")
+      .insert({
+        user_id: user.id,
+        type: "idea_enrich",
+        status: "search_queued",
+        input: {
+          idea_id: ideaId,
+        },
+      })
+      .select("id")
+      .single();
+
+    if (jobError || !job) {
+      return NextResponse.json(
+        { error: jobError?.message || "Failed to queue idea enrichment" },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ idea, job_id: job.id });
   } catch (error) {
     console.error("Save idea error:", error);
     return NextResponse.json(

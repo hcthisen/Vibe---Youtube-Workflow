@@ -96,6 +96,24 @@ interface GenerateOutlierIdeaResult {
   error?: string;
 }
 
+interface GenerateAdaptedIdeaParams {
+  baselineContext: string;
+  baselineKeywords: string[];
+  sourceTitle: string;
+  sourceChannel?: string | null;
+  transcript?: string | null;
+}
+
+interface GenerateAdaptedIdeaResult {
+  success: boolean;
+  title_concept: string;
+  thesis: string;
+  why_now: string;
+  hook_options: string[];
+  thumbnail_text_ideas: string[];
+  error?: string;
+}
+
 class OpenAIClient {
   private baseUrl = "https://api.openai.com/v1";
   private apiKey: string;
@@ -175,7 +193,14 @@ class OpenAIClient {
       }
 
       const data = await response.json();
-      return data.output?.[0]?.content?.[0]?.text || data.output_text || "";
+      const content = data.output?.[0]?.content?.[0];
+      if (content?.json) {
+        return JSON.stringify(content.json);
+      }
+      if (content?.text) {
+        return content.text;
+      }
+      return data.output_text || "";
     } else {
       // Use legacy GPT-4 API (chat completions endpoint)
       const response = await fetch(`${this.baseUrl}/chat/completions`, {
@@ -227,10 +252,59 @@ class OpenAIClient {
     try {
       return JSON.parse(response.trim());
     } catch (e) {
+      const extracted = this.extractJsonCandidate(response);
+      if (extracted) {
+        try {
+          return JSON.parse(extracted);
+        } catch (innerError) {
+          // Continue to error below
+        }
+      }
       // Include a sample of the response to help debug
       const sample = response.substring(0, 300).replace(/\n/g, ' ');
       throw new Error(`Failed to parse JSON response from OpenAI. Response sample: ${sample}...`);
     }
+  }
+
+  private extractJsonCandidate(response: string): string | null {
+    const text = response.trim();
+    if (!text) return null;
+
+    const startIndex = text.search(/[\[{]/);
+    if (startIndex === -1) return null;
+
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+    for (let i = startIndex; i < text.length; i++) {
+      const char = text[i];
+      if (inString) {
+        if (escape) {
+          escape = false;
+        } else if (char === "\\") {
+          escape = true;
+        } else if (char === "\"") {
+          inString = false;
+        }
+        continue;
+      }
+
+      if (char === "\"") {
+        inString = true;
+        continue;
+      }
+
+      if (char === "{" || char === "[") {
+        depth += 1;
+      } else if (char === "}" || char === "]") {
+        depth -= 1;
+        if (depth === 0) {
+          return text.slice(startIndex, i + 1);
+        }
+      }
+    }
+
+    return null;
   }
 
   async generateIdeas(params: GenerateIdeasParams): Promise<GenerateIdeasResult> {
@@ -252,11 +326,11 @@ ${params.focusTopic ? `Focus topic: ${params.focusTopic}` : ""}
 
 For each idea, provide:
 - title_concept: A working title for the video
-- thesis: The core argument or value proposition (1-2 sentences)
-- why_now: Why this topic is relevant right now
-- hook_options: 3 different hook options to start the video
-- thumbnail_text_ideas: 2-3 short text phrases for thumbnail
-- search_queries_used: What queries led to this idea
+- thesis: The core argument or value proposition (1 sentence)
+- why_now: Why this topic is relevant right now (1 sentence)
+- hook_options: 3 different hook options (8-12 words each)
+- thumbnail_text_ideas: 2-4 short text phrases (2-4 words each)
+- search_queries_used: 2-3 short search queries
 
 Respond with a JSON object: { "ideas": [...] }`;
 
@@ -267,7 +341,7 @@ Respond with a JSON object: { "ideas": [...] }`;
         ],
         {
           temperature: 0.8,
-          maxTokens: Math.min(12000, Math.max(4096, params.count * 400)),
+          maxTokens: Math.min(20000, Math.max(6000, params.count * 300)),
           responseJsonSchema: {
             name: "deep_research_ideas",
             schema: {
@@ -573,6 +647,91 @@ Respond with JSON: { "summary": "...", "hook_options": [...], "thumbnail_text_id
       return {
         success: false,
         summary: "",
+        hook_options: [],
+        thumbnail_text_ideas: [],
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  }
+
+  async generateAdaptedIdeaFromSource(
+    params: GenerateAdaptedIdeaParams
+  ): Promise<GenerateAdaptedIdeaResult> {
+    try {
+      const systemPrompt = `You are a YouTube strategist. Adapt a trending source video into a new idea that fits the creator's niche.
+You must respond with valid JSON only.`;
+
+      const userPrompt = `Creator baseline:
+${params.baselineContext}
+
+Keywords: ${params.baselineKeywords.join(", ")}
+
+Source video title: ${params.sourceTitle}
+${params.sourceChannel ? `Source channel: ${params.sourceChannel}` : ""}
+
+Transcript excerpt (may be truncated):
+${params.transcript || "Transcript not available."}
+
+Write an adapted idea that fits THIS creator's niche (not a copy of the source).
+Use first-person ("I") phrasing so it feels like the creator's plan.
+
+Return:
+- title_concept: A strong, creator-fit title
+- thesis: 1 sentence summary of what I will make
+- why_now: 1 sentence on why this is timely for my audience
+- hook_options: 3 hook lines (8-12 words each)
+- thumbnail_text_ideas: 3-5 short phrases (2-4 words each)
+
+Respond with JSON: { "title_concept": "...", "thesis": "...", "why_now": "...", "hook_options": [...], "thumbnail_text_ideas": [...] }`;
+
+      const response = await this.chat(
+        [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        {
+          temperature: 0.7,
+          maxTokens: 2000,
+          responseJsonSchema: {
+            name: "adapted_idea",
+            schema: {
+              type: "object",
+              additionalProperties: false,
+              required: ["title_concept", "thesis", "why_now", "hook_options", "thumbnail_text_ideas"],
+              properties: {
+                title_concept: { type: "string" },
+                thesis: { type: "string" },
+                why_now: { type: "string" },
+                hook_options: { type: "array", items: { type: "string" } },
+                thumbnail_text_ideas: { type: "array", items: { type: "string" } },
+              },
+            },
+          },
+        }
+      );
+
+      const parsed = this.parseJsonResponse<{
+        title_concept: string;
+        thesis: string;
+        why_now: string;
+        hook_options: string[];
+        thumbnail_text_ideas: string[];
+      }>(response);
+
+      return {
+        success: true,
+        title_concept: parsed.title_concept || "",
+        thesis: parsed.thesis || "",
+        why_now: parsed.why_now || "",
+        hook_options: parsed.hook_options || [],
+        thumbnail_text_ideas: parsed.thumbnail_text_ideas || [],
+      };
+    } catch (error) {
+      return {
+        success: false,
+        title_concept: "",
+        thesis: "",
+        why_now: "",
         hook_options: [],
         thumbnail_text_ideas: [],
         error: error instanceof Error ? error.message : "Unknown error",
