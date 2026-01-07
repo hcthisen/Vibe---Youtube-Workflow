@@ -1,5 +1,6 @@
 """
-Video Processing Handler - Complete pipeline with VAD, transcription, LLM cuts, and intro transition.
+Video Processing Handler - Complete pipeline with VAD, transcription, LLM cuts,
+intro transition, and loudness normalization.
 """
 import os
 import json
@@ -11,6 +12,12 @@ from utils.vad_processor import process_video_vad
 from utils.transcription import transcribe_video, search_transcript_for_phrases, remove_segments_from_transcript
 from utils.llm_cuts import analyze_retake_cuts, apply_cuts_to_video, normalize_llm_model
 from utils.intro_transition import add_intro_transition
+from utils.audio_normalization import (
+    normalize_audio_loudness,
+    DEFAULT_TARGET_LUFS,
+    DEFAULT_TRUE_PEAK,
+    DEFAULT_LRA,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +32,8 @@ class VideoProcessHandler(BaseHandler):
         2. Transcription
         3. Retake marker detection & LLM cuts (if enabled)
         4. Intro transition (if enabled)
-        5. Upload all assets
+        5. Audio loudness normalization (-14 LUFS)
+        6. Upload all assets
         """
         try:
             asset_id = input_data.get("asset_id")
@@ -72,6 +80,7 @@ class VideoProcessHandler(BaseHandler):
             vad_output_path = os.path.join(self.temp_dir, f"{job_id}_vad.mp4")
             cuts_output_path = os.path.join(self.temp_dir, f"{job_id}_cuts.mp4")
             final_output_path = os.path.join(self.temp_dir, f"{job_id}_final.mp4")
+            normalized_output_path = os.path.join(self.temp_dir, f"{job_id}_normalized.mp4")
 
             try:
                 # Download video
@@ -194,8 +203,34 @@ class VideoProcessHandler(BaseHandler):
                     shutil.copy(current_video_path, final_output_path)
                     current_video_path = final_output_path
 
-                # ===== STEP 5: Upload Assets =====
-                logger.info("Step 5: Uploading assets")
+                # ===== STEP 5: Audio Loudness Normalization =====
+                logger.info("Step 5: Applying audio loudness normalization (-14 LUFS)")
+                audio_normalization_applied = False
+                audio_normalization_status = "failed"
+                audio_normalization_note = None
+
+                normalization_result = normalize_audio_loudness(
+                    input_path=current_video_path,
+                    output_path=normalized_output_path,
+                    target_lufs=DEFAULT_TARGET_LUFS,
+                    true_peak_db=DEFAULT_TRUE_PEAK,
+                    lra=DEFAULT_LRA,
+                )
+
+                if normalization_result["success"]:
+                    audio_normalization_applied = normalization_result.get("normalized", False)
+                    audio_normalization_status = normalization_result.get(
+                        "status",
+                        "applied" if audio_normalization_applied else "skipped",
+                    )
+                    audio_normalization_note = normalization_result.get("note")
+                    current_video_path = normalized_output_path
+                else:
+                    audio_normalization_note = normalization_result.get("error")
+                    logger.warning(f"Audio normalization failed: {audio_normalization_note}")
+
+                # ===== STEP 6: Upload Assets =====
+                logger.info("Step 6: Uploading assets")
                 
                 # Upload processed video
                 output_storage_path = path.replace(".mp4", "_processed.mp4").replace(
@@ -310,15 +345,25 @@ class VideoProcessHandler(BaseHandler):
                         "prefer_sentence_boundaries": retake_prefer_sentence_boundaries
                     } if retake_cuts else None,
                     "intro_transition_applied": intro_applied,
+                    "audio_normalization": {
+                        "target_lufs": DEFAULT_TARGET_LUFS,
+                        "true_peak_db": DEFAULT_TRUE_PEAK,
+                        "loudness_range_lu": DEFAULT_LRA,
+                        "status": audio_normalization_status,
+                        "applied": audio_normalization_applied,
+                    },
                     "transcript_word_count": len(transcript_words),
                     "transcript_words_removed": transcription_result.get("word_count", 0) - len(transcript_words),
                     "processing_steps": [
                         "vad_silence_removal",
                         "transcription",
                         "llm_retake_cuts" if retake_cuts else None,
-                        "intro_transition" if intro_applied else None
+                        "intro_transition" if intro_applied else None,
+                        "audio_loudness_normalization",
                     ]
                 }
+                if audio_normalization_note:
+                    edit_report["audio_normalization"]["note"] = audio_normalization_note
                 # Remove None values
                 edit_report["processing_steps"] = [s for s in edit_report["processing_steps"] if s]
 
@@ -365,7 +410,7 @@ class VideoProcessHandler(BaseHandler):
 
             finally:
                 # Cleanup temp files
-                for f in [input_path, vad_output_path, cuts_output_path, final_output_path]:
+                for f in [input_path, vad_output_path, cuts_output_path, final_output_path, normalized_output_path]:
                     if os.path.exists(f):
                         try:
                             os.remove(f)

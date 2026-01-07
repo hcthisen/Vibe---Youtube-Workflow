@@ -4,6 +4,7 @@ The media worker handles video processing tasks including:
 - **VAD-based silence removal** using Silero VAD
 - **Transcription** with OpenAI Whisper
 - **Retake marker detection** and LLM-based cuts
+- **Audio loudness normalization** targeting -14 LUFS (YouTube standard)
 - **3D intro transitions** using Remotion (optional)
 - **Pose analysis** for headshot images
 
@@ -438,7 +439,16 @@ import json, re, time      # Parsing and retries
 
 **See also**: `workers/media/docs/RETAKE_DETECTION.md` for comprehensive guide
 
-### 4. 3D Intro Transitions (Optional)
+### 4. Audio Loudness Normalization (YouTube -14 LUFS)
+
+Normalizes audio to YouTube-friendly loudness targets using FFmpeg loudnorm:
+
+- **Target loudness**: -14 LUFS
+- **True peak**: -1.5 dBTP
+- **Loudness range**: 11 LU
+- **Applied last**: Runs after cuts/transitions so the final output is upload-ready
+
+### 5. 3D Intro Transitions (Optional)
 
 Overlays a 3D swivel intro transition on the video:
 
@@ -450,7 +460,7 @@ Overlays a 3D swivel intro transition on the video:
 
 **See [Intro Transitions](#intro-transitions) section below for setup.**
 
-### 5. Pose Analysis
+### 6. Pose Analysis
 
 Analyzes face pose (yaw/pitch) in headshot images using MediaPipe:
 

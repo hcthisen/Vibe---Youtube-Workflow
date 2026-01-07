@@ -198,15 +198,16 @@ const VideoTransition3D: React.FC = () => {{
   const {{ durationInFrames, fps }} = useVideoConfig();
 
   const frameCount = {frame_count};
-  const playbackRate = {playback_rate};
   const swivelStart = {swivel_start};
   const swivelEnd = {swivel_end};
   const tiltStart = {tilt_start};
   const tiltEnd = {tilt_end};
   const perspectiveVal = {perspective};
 
-  // Which source frame to show
-  const sourceFrameIndex = Math.min(Math.floor(frame * playbackRate), frameCount - 1);
+  // Which source frame to show (scale to avoid freezing if frame counts differ)
+  const durationFrames = Math.max(durationInFrames - 1, 1);
+  const frameRatio = (frameCount - 1) / durationFrames;
+  const sourceFrameIndex = Math.min(Math.floor(frame * frameRatio), frameCount - 1);
 
   // Progress for 3D effect{easing_code}
 
