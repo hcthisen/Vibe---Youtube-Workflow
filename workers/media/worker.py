@@ -114,6 +114,21 @@ class MediaWorker:
             if isinstance(job, list):
                 job = job[0] if job else None
 
+            if not job or not isinstance(job, dict):
+                return None
+
+            job_id = job.get("id")
+            job_type = job.get("type")
+            if not job_id or not job_type or job_type not in supported_types:
+                logger.warning("Received invalid job payload from claim_next_job; skipping")
+                _debug_log(
+                    "F",
+                    "workers/media/worker.py:_get_next_job",
+                    "Invalid job payload from claim_next_job",
+                    {"job": job},
+                )
+                return None
+
             _debug_log(
                 "F",
                 "workers/media/worker.py:_get_next_job",
@@ -157,6 +172,10 @@ class MediaWorker:
         job_id = job["id"]
         job_type = job["type"]
         job_input = job["input"]
+
+        if not job_id or not job_type:
+            logger.warning("Skipping job with missing id or type")
+            return
         
         logger.info(f"Processing job {job_id} (type: {job_type})")
         
