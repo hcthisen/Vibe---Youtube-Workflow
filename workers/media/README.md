@@ -31,7 +31,7 @@ pip install -r requirements.txt
 
 # Install system dependencies (Ubuntu/Debian)
 sudo apt-get update
-sudo apt-get install -y ffmpeg postgresql-client
+sudo apt-get install -y ffmpeg
 ```
 
 ### Full Setup with Intro Transitions
@@ -62,11 +62,8 @@ cd -
 Create a `.env` file or set these environment variables:
 
 ```bash
-# Database connection
-DATABASE_URL=postgresql://postgres:password@host:5432/postgres
-
-# Supabase (for storage and database queries)
-SUPABASE_URL=https://your-project.supabase.co
+# Supabase (storage + database via API/RPC)
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
 # OpenAI (for LLM cuts)
@@ -74,13 +71,15 @@ OPENAI_API_KEY=sk-...
 OPENAI_MODEL=gpt-5.2
 
 # Optional: Worker configuration
-WORKER_CHECK_INTERVAL=5  # seconds between job checks
+WORKER_POLL_INTERVAL=5  # seconds between job checks
 
 # Optional: Upload configuration (for large files)
 UPLOAD_TIMEOUT_SECONDS=600  # 10 minutes (default)
 UPLOAD_CHUNK_SIZE_MB=6      # 6MB chunks (default, matches frontend TUS uploads)
 UPLOAD_MAX_RETRIES=3        # Max retry attempts (default)
 ```
+
+Note: the worker requires the `claim_next_job`, `complete_job`, and `fail_job` RPCs (see `supabase/migrations/022_add_claim_next_job_rpc.sql`).
 
 ### Large File Support
 
@@ -669,17 +668,14 @@ sudo apt-get install -y ffmpeg
 brew install ffmpeg
 ```
 
-### Database Connection Errors
+### Supabase API Errors
 
-**Problem**: `psycopg2.OperationalError: could not connect to server`
+**Problem**: Worker fails to claim jobs or update status
 
 **Solution**:
-1. Check `DATABASE_URL` in your `.env` file
-2. Verify the database is running and accessible
-3. Test connection:
-```bash
-psql "$DATABASE_URL" -c "SELECT 1"
-```
+1. Check `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in your `.env`
+2. Verify the `claim_next_job` RPC exists (see migrations)
+3. Ensure the service role key is correct (RLS bypass is required)
 
 ### Supabase Storage Errors
 
@@ -718,14 +714,15 @@ npx remotion preview src/index.ts
 **Problem**: Worker runs but doesn't pick up jobs
 
 **Checklist**:
-1. Check database connection (see above)
+1. Check Supabase credentials (see above)
 2. Verify jobs exist in the `jobs` table:
    ```sql
-   SELECT id, job_type, status, created_at FROM jobs 
+   SELECT id, type, status, created_at FROM jobs 
    ORDER BY created_at DESC LIMIT 10;
    ```
-3. Check job status - worker only picks up `pending` jobs
-4. Look for errors in worker logs
+3. Check job status - worker only picks up `queued` jobs
+4. Ensure `claim_next_job` RPC exists and is executable by `service_role`
+5. Look for errors in worker logs
 
 ### Performance Issues
 
@@ -748,14 +745,14 @@ npx remotion preview src/index.ts
 ```
 1. User uploads video → creates raw_video asset
 2. API creates video_process job
-3. Worker polls database for pending jobs
+3. Worker claims queued jobs via Supabase RPC
 4. Worker processes video:
    ├─ VAD silence removal
    ├─ Transcription (Whisper)
    ├─ Retake detection (optional)
    ├─ Intro transition (optional)
    └─ Upload all assets
-5. Worker updates job status to completed
+5. Worker updates job status via Supabase API
 6. Frontend polls job status and displays results
 ```
 
@@ -784,13 +781,11 @@ workers/media/
 **Python packages** (see `requirements.txt`):
 - `openai-whisper` - transcription
 - `torch` - Silero VAD model
-- `psycopg2` - database
 - `supabase` - storage & API
 - `mediapipe` - pose analysis
 
 **System dependencies**:
 - `ffmpeg` - video/audio processing
-- `postgresql-client` - database access
 
 **Optional (for intro transitions)**:
 - `node` - JavaScript runtime
@@ -807,8 +802,7 @@ workers/media/
 cd workers/media
 
 # Set environment variables
-export DATABASE_URL="postgresql://..."
-export SUPABASE_URL="https://..."
+export NEXT_PUBLIC_SUPABASE_URL="https://..."
 export SUPABASE_SERVICE_ROLE_KEY="..."
 export OPENAI_API_KEY="sk-..."
 
@@ -869,7 +863,7 @@ HANDLERS = {
 
 For issues related to:
 - **Video processing**: Check FFmpeg installation and logs
-- **Database**: Verify `DATABASE_URL` and migrations
+- **Database**: Verify Supabase credentials and migrations
 - **Storage**: Check Supabase credentials and bucket policies
 - **Intro transitions**: See [Intro Transitions](#intro-transitions) section
 - **Performance**: See performance tips in [Troubleshooting](#troubleshooting)

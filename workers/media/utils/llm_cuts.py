@@ -297,7 +297,7 @@ def _call_responses_api(
         ],
         "temperature": temperature,
         "max_output_tokens": max_output_tokens,
-        "response_format": {"type": "json_object"},
+        "text": {"format": {"type": "json_object"}},
     }
     headers = {
         "Authorization": f"Bearer {api_key}",

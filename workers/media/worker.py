@@ -7,10 +7,7 @@ import time
 import json
 import signal
 import logging
-from datetime import datetime
 
-import psycopg2
-from psycopg2.extras import RealDictCursor
 from supabase import create_client
 
 from config import Config
@@ -55,7 +52,6 @@ class MediaWorker:
         Config.validate()
         
         self.running = True
-        self.conn = None
         self.supabase = create_client(Config.SUPABASE_URL, Config.SUPABASE_SERVICE_KEY)
         
         # Ensure temp directory exists
@@ -79,121 +75,76 @@ class MediaWorker:
         logger.info("Shutdown signal received, finishing current job...")
         self.running = False
 
-    def _connect_db(self, force_reconnect=False):
-        """Connect to PostgreSQL database."""
-        if force_reconnect or self.conn is None or self.conn.closed:
-            # Close existing connection if any
-            if self.conn:
-                try:
-                    self.conn.close()
-                except:
-                    pass
-            
-            self.conn = psycopg2.connect(Config.DATABASE_URL)
-            self.conn.autocommit = False
-            logger.info("Connected to database")
-        return self.conn
-    
     def _execute_with_retry(self, operation, *args, max_retries=3):
-        """Execute a database operation with automatic retry on connection errors."""
+        """Execute a Supabase operation with automatic retry on transient errors."""
         for attempt in range(max_retries):
             try:
-                # Force reconnect on retry attempts
-                if attempt > 0:
-                    logger.info(f"Retry attempt {attempt + 1}/{max_retries}")
-                    self._connect_db(force_reconnect=True)
-                
                 return operation(*args)
             
-            except (psycopg2.OperationalError, psycopg2.InterfaceError) as e:
-                logger.warning(f"Database connection error (attempt {attempt + 1}/{max_retries}): {e}")
-                
-                # Reset connection
-                if self.conn:
-                    try:
-                        self.conn.close()
-                    except:
-                        pass
-                    self.conn = None
-                
+            except Exception as e:
+                logger.warning(f"Supabase error (attempt {attempt + 1}/{max_retries}): {e}")
                 if attempt == max_retries - 1:
                     # Last attempt failed, re-raise
                     raise
                 
-                time.sleep(1)  # Brief pause before retry
+                time.sleep(1 * (2 ** attempt))  # Brief pause before retry
 
     def _get_next_job(self):
         """Get the next queued job."""
-        # Use fresh connection for each poll to avoid stale connections
-        conn = self._connect_db(force_reconnect=False)
         supported_types = list(self.handlers.keys())
         _debug_log("F", "workers/media/worker.py:_get_next_job", "Polling for next media job", {"supported_types": supported_types})
         
         try:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                # Lock and fetch next queued job
-                cur.execute("""
-                    UPDATE jobs
-                    SET status = 'running', updated_at = NOW()
-                    WHERE id = (
-                        SELECT id FROM jobs
-                        WHERE status = 'queued'
-                          AND type = ANY(%s)
-                        ORDER BY created_at ASC
-                        FOR UPDATE SKIP LOCKED
-                        LIMIT 1
-                    )
-                    RETURNING *
-                """, (supported_types,))
-                
-                job = cur.fetchone()
-                conn.commit()
-                _debug_log("F", "workers/media/worker.py:_get_next_job", "Fetched job", {"found": bool(job), "job_type": job.get("type") if job else None, "job_id": job.get("id") if job else None})
-                return dict(job) if job else None
-        
-        except (psycopg2.OperationalError, psycopg2.InterfaceError) as e:
-            logger.warning(f"Connection error while fetching job: {e}")
-            # Reset connection and return None (will retry next poll)
-            if self.conn:
-                try:
-                    self.conn.close()
-                except:
-                    pass
-                self.conn = None
+            def _claim_job():
+                result = self.supabase.rpc(
+                    "claim_next_job",
+                    {"supported_types": supported_types}
+                ).execute()
+                error = getattr(result, "error", None)
+                if error:
+                    raise RuntimeError(f"claim_next_job RPC failed: {error}")
+                return result.data
+
+            job = self._execute_with_retry(_claim_job)
+            if isinstance(job, list):
+                job = job[0] if job else None
+
+            _debug_log(
+                "F",
+                "workers/media/worker.py:_get_next_job",
+                "Fetched job",
+                {"found": bool(job), "job_type": job.get("type") if job else None, "job_id": job.get("id") if job else None}
+            )
+            return dict(job) if job else None
+
+        except Exception as e:
+            logger.warning(f"Supabase error while fetching job: {e}")
             return None
 
     def _complete_job(self, job_id: str, output: dict):
         """Mark job as succeeded."""
         def _do_complete(job_id, output):
-            # Force fresh connection before updating job status (prevents timeout issues)
-            logger.info("Refreshing database connection before marking job complete")
-            conn = self._connect_db(force_reconnect=True)
-            
-            with conn.cursor() as cur:
-                cur.execute("""
-                    UPDATE jobs
-                    SET status = 'succeeded', output = %s, updated_at = NOW()
-                    WHERE id = %s
-                """, (json.dumps(output), job_id))
-                conn.commit()
-        
+            result = self.supabase.rpc(
+                "complete_job",
+                {"job_id": job_id, "job_output": output},
+            ).execute()
+            error = getattr(result, "error", None)
+            if error:
+                raise RuntimeError(f"Failed to update job {job_id}: {error}")
+
         self._execute_with_retry(_do_complete, job_id, output)
 
     def _fail_job(self, job_id: str, error: str):
         """Mark job as failed."""
         def _do_fail(job_id, error):
-            # Force fresh connection before updating job status (prevents timeout issues)
-            logger.info("Refreshing database connection before marking job failed")
-            conn = self._connect_db(force_reconnect=True)
-            
-            with conn.cursor() as cur:
-                cur.execute("""
-                    UPDATE jobs
-                    SET status = 'failed', error = %s, updated_at = NOW()
-                    WHERE id = %s
-                """, (error, job_id))
-                conn.commit()
-        
+            result = self.supabase.rpc(
+                "fail_job",
+                {"job_id": job_id, "job_error": error},
+            ).execute()
+            err = getattr(result, "error", None)
+            if err:
+                raise RuntimeError(f"Failed to update job {job_id}: {err}")
+
         self._execute_with_retry(_do_fail, job_id, error)
 
     def _process_job(self, job: dict):
@@ -241,26 +192,11 @@ class MediaWorker:
                     # No jobs, sleep before polling again
                     time.sleep(Config.POLL_INTERVAL)
                     
-            except psycopg2.Error as e:
-                logger.error(f"Database error: {e}")
-                # Reset connection
-                if self.conn:
-                    try:
-                        self.conn.close()
-                    except:
-                        pass
-                    self.conn = None
-                time.sleep(5)
-                
             except Exception as e:
                 logger.exception("Unexpected error in worker loop")
                 time.sleep(5)
         
         logger.info("Media Worker stopped")
-        
-        # Cleanup
-        if self.conn:
-            self.conn.close()
 
 
 if __name__ == "__main__":

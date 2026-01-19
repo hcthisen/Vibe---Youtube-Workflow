@@ -1,7 +1,6 @@
 # YouTube Production Assistant - Media Worker Dependencies
 
-# Database
-psycopg2-binary==2.9.9
+# Supabase API
 supabase==2.9.1
 
 # Video Processing (using ffmpeg directly via subprocess - moviepy not needed)

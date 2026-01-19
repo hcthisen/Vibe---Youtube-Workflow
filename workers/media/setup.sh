@@ -60,19 +60,16 @@ if [ ! -f ".env" ]; then
     echo "⚠️  No .env file found"
     echo "Creating .env from template..."
     cat > .env << 'EOF'
-# Database
-DATABASE_URL=postgresql://user:pass@host:5432/db
-
 # Supabase
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_SERVICE_KEY=your-service-key
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
 # OpenAI (for LLM retake analysis)
 OPENAI_API_KEY=sk-...
 
 # Worker Settings
-POLL_INTERVAL=5
-TEMP_DIR=/tmp/media-worker
+WORKER_POLL_INTERVAL=5
+WORKER_TEMP_DIR=/tmp/media-worker
 EOF
     echo "✅ Created .env template"
     echo "⚠️  Please edit .env with your actual credentials"

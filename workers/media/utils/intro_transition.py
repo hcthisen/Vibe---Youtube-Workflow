@@ -324,13 +324,19 @@ def add_intro_transition(
             try:
                 from vad_processor import get_cached_encoder_args
                 encoder_args = get_cached_encoder_args()
-                logger.info(f"Using hardware encoding: {' '.join(encoder_args)}")
+                encoder_name = "unknown"
+                try:
+                    idx = encoder_args.index("-c:v")
+                    encoder_name = encoder_args[idx + 1]
+                except Exception:
+                    pass
+                logger.info(f"Using video encoder: {encoder_name} ({' '.join(encoder_args)})")
             finally:
                 sys.path.pop(0)
         except Exception:
             # Fallback to software encoding
             encoder_args = ["-c:v", "libx264", "-preset", "medium", "-crf", "23"]
-            logger.info("Using software encoding (libx264)")
+            logger.info(f"Using video encoder: libx264 ({' '.join(encoder_args)})")
         
         # Build FFmpeg command
         filter_complex = (
