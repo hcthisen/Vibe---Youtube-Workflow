@@ -9,9 +9,89 @@ import os
 import re
 import logging
 import shutil
+import threading
 from typing import List, Tuple
 
 logger = logging.getLogger(__name__)
+
+
+_silero_lock = threading.Lock()
+_silero_model = None
+_silero_utils = None
+
+_hardware_encoder_available = None
+
+
+def _check_hardware_encoder_available(encoder: str) -> bool:
+    try:
+        result = subprocess.run(
+            ["ffmpeg", "-hide_banner", "-encoders"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        return encoder in (result.stdout or "")
+    except Exception:
+        return False
+
+
+def get_cached_encoder_args() -> list[str]:
+    """
+    Return FFmpeg video encoder args, preferring hardware encoding when available.
+
+    Currently detects Apple Silicon's `h264_videotoolbox` and falls back to libx264.
+    """
+    global _hardware_encoder_available
+
+    if _hardware_encoder_available is None:
+        _hardware_encoder_available = _check_hardware_encoder_available("h264_videotoolbox")
+        if _hardware_encoder_available:
+            logger.info("Hardware encoding enabled (h264_videotoolbox)")
+        else:
+            logger.info("Using software encoding (libx264)")
+
+    if _hardware_encoder_available:
+        return ["-c:v", "h264_videotoolbox", "-b:v", "10M"]
+
+    return ["-c:v", "libx264", "-preset", "fast", "-crf", "18"]
+
+
+def _has_stream(input_path: str, stream_selector: str) -> bool:
+    ffprobe_path = shutil.which("ffprobe")
+    if not ffprobe_path:
+        ffmpeg_path = shutil.which("ffmpeg")
+        if not ffmpeg_path:
+            return True
+
+        result = subprocess.run(
+            [ffmpeg_path, "-hide_banner", "-i", input_path],
+            capture_output=True,
+            text=True,
+        )
+        combined = f"{result.stderr or ''}\n{result.stdout or ''}"
+        if stream_selector == "a":
+            return bool(re.search(r"Stream #\d+:\d+(?:\([^)]*\))?: Audio:", combined))
+        if stream_selector == "v":
+            return bool(re.search(r"Stream #\d+:\d+(?:\([^)]*\))?: Video:", combined))
+        return True
+
+    cmd = [
+        ffprobe_path,
+        "-v",
+        "error",
+        "-select_streams",
+        stream_selector,
+        "-show_entries",
+        "stream=index",
+        "-of",
+        "csv=p=0",
+        input_path,
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        return True
+
+    return bool((result.stdout or "").strip())
 
 
 def extract_audio(video_path: str, audio_path: str, sample_rate: int = 16000):
@@ -36,13 +116,21 @@ def get_speech_timestamps_silero(
     """
     import torch
 
-    # Load Silero VAD model
-    model, utils = torch.hub.load(
-        repo_or_dir='snakers4/silero-vad',
-        model='silero_vad',
-        force_reload=False,
-        trust_repo=True
-    )
+    global _silero_model, _silero_utils
+    if _silero_model is None or _silero_utils is None:
+        with _silero_lock:
+            if _silero_model is None or _silero_utils is None:
+                model, utils = torch.hub.load(
+                    repo_or_dir="snakers4/silero-vad",
+                    model="silero_vad",
+                    force_reload=False,
+                    trust_repo=True,
+                )
+                _silero_model = model
+                _silero_utils = utils
+
+    model = _silero_model
+    utils = _silero_utils
 
     (get_speech_timestamps, save_audio, read_audio, VADIterator, collect_chunks) = utils
 
@@ -183,7 +271,7 @@ def concatenate_segments(
     segments: List[Tuple[float, float]],
     output_path: str
 ):
-    """Extract and concatenate video segments using FFmpeg."""
+    """Extract and concatenate video segments using a single FFmpeg pass."""
     if not segments:
         # No cuts needed, just copy
         subprocess.run(
@@ -195,39 +283,74 @@ def concatenate_segments(
 
     logger.info(f"Concatenating {len(segments)} segments...")
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        segment_files = []
+    try:
+        duration = get_duration(input_path)
+        if (
+            len(segments) == 1
+            and segments[0][0] <= 0.001
+            and segments[0][1] >= max(0.0, duration - 0.001)
+        ):
+            subprocess.run(
+                ["ffmpeg", "-y", "-i", input_path, "-c", "copy", output_path],
+                capture_output=True,
+                check=True,
+            )
+            return
+    except Exception:
+        pass
 
-        for i, (start, end) in enumerate(segments):
-            seg_path = os.path.join(tmpdir, f"seg_{i:04d}.mp4")
-            duration = end - start
+    has_audio = _has_stream(input_path, "a")
 
-            # Frame-accurate cutting with re-encode
-            cmd = [
-                "ffmpeg", "-y",
-                "-i", input_path,
-                "-ss", str(start),
-                "-t", str(duration),
-                "-c:v", "libx264", "-preset", "fast", "-crf", "18",
-                "-c:a", "aac", "-b:a", "192k",
-                "-loglevel", "error",
-                seg_path
-            ]
-            subprocess.run(cmd, capture_output=True, check=True)
-            segment_files.append(seg_path)
+    filter_lines: list[str] = []
+    concat_inputs: list[str] = []
+    for i, (start, end) in enumerate(segments):
+        filter_lines.append(
+            f"[0:v]trim=start={start:.6f}:end={end:.6f},setpts=PTS-STARTPTS[v{i}];"
+        )
+        concat_inputs.append(f"[v{i}]")
+        if has_audio:
+            filter_lines.append(
+                f"[0:a]atrim=start={start:.6f}:end={end:.6f},asetpts=PTS-STARTPTS[a{i}];"
+            )
+            concat_inputs.append(f"[a{i}]")
 
-        # Create concat file
-        concat_path = os.path.join(tmpdir, "concat.txt")
-        with open(concat_path, "w") as f:
-            for seg_path in segment_files:
-                f.write(f"file '{seg_path}'\n")
+    if has_audio:
+        filter_lines.append(
+            f"{''.join(concat_inputs)}concat=n={len(segments)}:v=1:a=1[outv][outa]"
+        )
+    else:
+        filter_lines.append(
+            f"{''.join(concat_inputs)}concat=n={len(segments)}:v=1:a=0[outv]"
+        )
 
-        # Concatenate
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as tmp:
+        filter_script_path = tmp.name
+        tmp.write("\n".join(filter_lines))
+
+    try:
         cmd = [
-            "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", concat_path,
-            "-c", "copy", "-loglevel", "error", output_path
+            "ffmpeg",
+            "-y",
+            "-i",
+            input_path,
+            "-filter_complex_script",
+            filter_script_path,
+            "-map",
+            "[outv]",
         ]
+        if has_audio:
+            cmd += ["-map", "[outa]"]
+
+        cmd += get_cached_encoder_args()
+        if has_audio:
+            cmd += ["-c:a", "aac", "-b:a", "192k"]
+
+        cmd += ["-movflags", "+faststart", "-loglevel", "error", output_path]
+
         subprocess.run(cmd, capture_output=True, check=True)
+    finally:
+        if os.path.exists(filter_script_path):
+            os.remove(filter_script_path)
 
     logger.info(f"Concatenation complete: {output_path}")
 

@@ -927,8 +927,6 @@ def apply_cuts_to_video(
         Dict with processing stats
     """
     import subprocess
-    import tempfile
-    import os
     
     if not cut_instructions:
         # No cuts, just copy
@@ -973,39 +971,9 @@ def apply_cuts_to_video(
     
     logger.info(f"Generated {len(keep_segments)} keep segments from cuts")
     
-    # Concatenate keep segments
-    with tempfile.TemporaryDirectory() as tmpdir:
-        segment_files = []
+    from utils.vad_processor import concatenate_segments
 
-        for i, (start, end) in enumerate(keep_segments):
-            seg_path = os.path.join(tmpdir, f"seg_{i:04d}.mp4")
-            seg_duration = end - start
-
-            cmd = [
-                "ffmpeg", "-y",
-                "-i", input_path,
-                "-ss", str(start),
-                "-t", str(seg_duration),
-                "-c:v", "libx264", "-preset", "fast", "-crf", "18",
-                "-c:a", "aac", "-b:a", "192k",
-                "-loglevel", "error",
-                seg_path
-            ]
-            subprocess.run(cmd, capture_output=True, check=True)
-            segment_files.append(seg_path)
-
-        # Create concat file
-        concat_path = os.path.join(tmpdir, "concat.txt")
-        with open(concat_path, "w") as f:
-            for seg_path in segment_files:
-                f.write(f"file '{seg_path}'\n")
-
-        # Concatenate
-        cmd = [
-            "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", concat_path,
-            "-c", "copy", "-loglevel", "error", output_path
-        ]
-        subprocess.run(cmd, capture_output=True, check=True)
+    concatenate_segments(input_path, keep_segments, output_path)
     
     logger.info(f"Cuts applied successfully: {output_path}")
     
