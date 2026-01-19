@@ -7,6 +7,7 @@ import time
 import json
 import signal
 import logging
+import random
 
 from supabase import create_client
 
@@ -25,10 +26,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-DEBUG_LOG_PATH = "/Users/hc/Documents/GitHub/Vibe---Youtube-Workflow/.cursor/debug.log"
+DEBUG_LOG_ENABLED = os.getenv("WORKER_DEBUG_LOG", "").lower() in ("1", "true", "yes")
+_debug_dir = os.getenv("WORKER_TEMP_DIR") or os.getenv("TEMP_DIR") or "/tmp/yt-worker"
+DEBUG_LOG_PATH = os.getenv("WORKER_DEBUG_LOG_PATH", os.path.join(_debug_dir, "worker.debug.log"))
 
 def _debug_log(hypothesis_id: str, location: str, message: str, data: dict):
     """Write NDJSON debug log line (avoid secrets)."""
+    if not DEBUG_LOG_ENABLED:
+        return
     try:
         payload = {
             "sessionId": "debug-session",
@@ -179,6 +184,12 @@ class MediaWorker:
 
     def run(self):
         """Main worker loop."""
+        base_interval = max(0.1, float(Config.POLL_INTERVAL))
+        max_idle_sleep = float(os.getenv("WORKER_MAX_IDLE_SLEEP", "30"))
+        idle_backoff_factor = float(os.getenv("WORKER_IDLE_BACKOFF_FACTOR", "2"))
+        idle_jitter = float(os.getenv("WORKER_IDLE_JITTER", "0.5"))
+        idle_multiplier = 1.0
+
         logger.info("Media Worker starting...")
         logger.info(f"Polling interval: {Config.POLL_INTERVAL}s")
         
@@ -187,14 +198,30 @@ class MediaWorker:
                 job = self._get_next_job()
                 
                 if job:
+                    idle_multiplier = 1.0
                     self._process_job(job)
                 else:
-                    # No jobs, sleep before polling again
-                    time.sleep(Config.POLL_INTERVAL)
+                    sleep_for = min(max_idle_sleep, base_interval * idle_multiplier)
+                    if idle_jitter > 0:
+                        sleep_for += random.uniform(0, idle_jitter)
+                    time.sleep(sleep_for)
+                    if base_interval * idle_multiplier < max_idle_sleep:
+                        idle_multiplier = min(
+                            idle_multiplier * idle_backoff_factor,
+                            max_idle_sleep / base_interval,
+                        )
                     
             except Exception as e:
                 logger.exception("Unexpected error in worker loop")
-                time.sleep(5)
+                sleep_for = min(max_idle_sleep, base_interval * idle_multiplier)
+                if idle_jitter > 0:
+                    sleep_for += random.uniform(0, idle_jitter)
+                time.sleep(sleep_for)
+                if base_interval * idle_multiplier < max_idle_sleep:
+                    idle_multiplier = min(
+                        idle_multiplier * idle_backoff_factor,
+                        max_idle_sleep / base_interval,
+                    )
         
         logger.info("Media Worker stopped")
 

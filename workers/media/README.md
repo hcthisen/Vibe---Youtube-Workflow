@@ -72,6 +72,11 @@ OPENAI_MODEL=gpt-5.2
 
 # Optional: Worker configuration
 WORKER_POLL_INTERVAL=5  # seconds between job checks
+WORKER_MAX_IDLE_SLEEP=30  # max backoff sleep when idle
+WORKER_IDLE_BACKOFF_FACTOR=2  # exponential backoff factor
+WORKER_IDLE_JITTER=0.5  # add small jitter to avoid thundering herd
+WORKER_DEBUG_LOG=0  # set to 1 to enable NDJSON debug logs
+WORKER_DEBUG_LOG_PATH=/tmp/yt-worker/worker.debug.log
 
 # Optional: Upload configuration (for large files)
 UPLOAD_TIMEOUT_SECONDS=600  # 10 minutes (default)
