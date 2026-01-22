@@ -5,10 +5,15 @@ import os
 import logging
 from typing import Any, Dict
 import numpy as np
+from urllib.parse import urljoin
 
 from .base import BaseHandler
+from utils.url_safety import validate_external_url
 
 logger = logging.getLogger(__name__)
+
+MAX_IMAGE_BYTES = int(os.getenv("MAX_IMAGE_DOWNLOAD_BYTES", str(10 * 1024 * 1024)))
+MAX_REDIRECTS = 3
 
 
 class PoseAnalyzeHandler(BaseHandler):
@@ -67,22 +72,59 @@ class PoseAnalyzeHandler(BaseHandler):
                 else:
                     # Download from URL
                     import httpx
-                    response = httpx.get(image_url, follow_redirects=True, timeout=30.0)
+                    current_url = image_url
+                    downloaded = False
 
-                    if response.status_code >= 400:
-                        return {
-                            "success": False,
-                            "error": f"Failed to download image_url (HTTP {response.status_code})",
-                        }
+                    for _ in range(MAX_REDIRECTS + 1):
+                        ok, reason, normalized_url = validate_external_url(current_url)
+                        if not ok or not normalized_url:
+                            return {"success": False, "error": reason or "Invalid image_url"}
 
-                    content_type = response.headers.get("content-type", "")
-                    if content_type and not content_type.startswith("image/"):
-                        return {
-                            "success": False,
-                            "error": f"image_url did not return an image (content-type: {content_type})",
-                        }
-                    with open(input_path, "wb") as f:
-                        f.write(response.content)
+                        with httpx.stream(
+                            "GET",
+                            normalized_url,
+                            follow_redirects=False,
+                            timeout=30.0,
+                        ) as response:
+                            if response.status_code in (301, 302, 303, 307, 308):
+                                location = response.headers.get("location")
+                                if not location:
+                                    return {"success": False, "error": "Redirect without location header"}
+                                current_url = urljoin(normalized_url, location)
+                                continue
+
+                            if response.status_code >= 400:
+                                return {
+                                    "success": False,
+                                    "error": f"Failed to download image_url (HTTP {response.status_code})",
+                                }
+
+                            content_type = response.headers.get("content-type", "")
+                            if content_type and not content_type.startswith("image/"):
+                                return {
+                                    "success": False,
+                                    "error": f"image_url did not return an image (content-type: {content_type})",
+                                }
+
+                            content_length = response.headers.get("content-length")
+                            if content_length and int(content_length) > MAX_IMAGE_BYTES:
+                                return {"success": False, "error": "image_url file too large"}
+
+                            total = 0
+                            with open(input_path, "wb") as f:
+                                for chunk in response.iter_bytes():
+                                    if not chunk:
+                                        continue
+                                    total += len(chunk)
+                                    if total > MAX_IMAGE_BYTES:
+                                        return {"success": False, "error": "image_url file too large"}
+                                    f.write(chunk)
+
+                            downloaded = True
+                            break
+
+                    if not downloaded:
+                        return {"success": False, "error": "Too many redirects while fetching image_url"}
 
                 # Analyze pose
                 logger.info("Analyzing face pose")

@@ -13,17 +13,9 @@ import "./load-env";
 
 import { createClient } from "@supabase/supabase-js";
 
-// #region agent log
-fetch('http://127.0.0.1:7242/ingest/18d926b1-f741-4713-b147-77616fe448c6',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'worker.ts:16',message:'Worker starting - after load-env import',data:{cwd:process.cwd(),hasSupabaseUrl:!!process.env.NEXT_PUBLIC_SUPABASE_URL,hasDataForSeoLogin:!!process.env.DATAFORSEO_LOGIN},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'FIX'})}).catch(()=>{});
-// #endregion
-
 // Import tools directly from registry (env vars now available)
 import { getTool } from "../../apps/web/src/lib/tools/registry";
 import type { ToolRunContext, ToolResult } from "../../apps/web/src/lib/tools/registry";
-
-// #region agent log
-fetch('http://127.0.0.1:7242/ingest/18d926b1-f741-4713-b147-77616fe448c6',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'worker.ts:25',message:'Tool registry imported successfully',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'FIX'})}).catch(()=>{});
-// #endregion
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -100,16 +92,8 @@ async function processJob(job: Job): Promise<void> {
   console.log(`   ⚙️  Status updated to search_running`);
 
   try {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/18d926b1-f741-4713-b147-77616fe448c6',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'worker.ts:120',message:'Getting tool from registry',data:{jobType:job.type,jobId:job.id},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'H'})}).catch(()=>{});
-    // #endregion
-    
     // Get the tool from registry
     const tool = getTool(job.type);
-    
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/18d926b1-f741-4713-b147-77616fe448c6',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'worker.ts:127',message:'Tool lookup result',data:{foundTool:!!tool,toolName:tool?.name,jobType:job.type},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'H'})}).catch(()=>{});
-    // #endregion
     
     if (!tool) {
       throw new Error(`Unknown tool: ${job.type}`);
@@ -223,10 +207,6 @@ async function processJob(job: Job): Promise<void> {
  */
 async function pollJobs(): Promise<void> {
   try {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/18d926b1-f741-4713-b147-77616fe448c6',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'worker.ts:199',message:'Polling for jobs',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'F'})}).catch(()=>{});
-    // #endregion
-    
     // Get queued search jobs
     const { data: jobs, error } = await supabase
       .from("jobs")
@@ -235,10 +215,6 @@ async function pollJobs(): Promise<void> {
       .in("type", ["outlier_search", "deep_research", "idea_enrich"])
       .order("created_at", { ascending: true })
       .limit(10);
-
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/18d926b1-f741-4713-b147-77616fe448c6',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'worker.ts:210',message:'Query result',data:{hasError:!!error,errorMsg:error?.message,jobsCount:jobs?.length||0,jobTypes:jobs?.map(j=>j.type)||[]},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'F,I'})}).catch(()=>{});
-    // #endregion
 
     if (error) {
       console.error("Error fetching jobs:", error);

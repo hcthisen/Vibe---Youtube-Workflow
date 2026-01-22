@@ -5,11 +5,15 @@ import time
 import logging
 import re
 from typing import Dict, Any, List, Optional
+from urllib.parse import urljoin
 import requests
 from supabase import Client
 from .base import BaseHandler
+from utils.url_safety import validate_external_url
 
 logger = logging.getLogger(__name__)
+MAX_IMAGE_BYTES = int(os.getenv("MAX_IMAGE_DOWNLOAD_BYTES", str(10 * 1024 * 1024)))
+MAX_REDIRECTS = 3
 
 def _extract_thumbnail_text_ideas(markdown: Optional[str]) -> List[str]:
     """
@@ -283,33 +287,52 @@ class ThumbnailGenerateHandler(BaseHandler):
             logger.error(f"Failed to download from storage: {e}")
             return None
     
-    def download_image_from_url(self, url: str) -> tuple[Optional[str], Optional[str]]:
+    def download_image_from_url(self, url: str, max_redirects: int = MAX_REDIRECTS) -> tuple[Optional[str], Optional[str]]:
         """
         Download an image from a URL and return base64 + mime type.
         Handles YouTube thumbnail URLs.
         """
         try:
+            ok, reason, normalized_url = validate_external_url(url)
+            if not ok or not normalized_url:
+                logger.error(f"Blocked reference thumbnail URL: {reason}")
+                return None, None
+
             # Convert YouTube video URLs to thumbnail URLs
-            if "youtube.com/watch" in url or "youtu.be/" in url:
-                video_id = self.extract_youtube_video_id(url)
+            if "youtube.com/watch" in normalized_url or "youtu.be/" in normalized_url:
+                video_id = self.extract_youtube_video_id(normalized_url)
                 if video_id:
-                    url = f"https://i.ytimg.com/vi/{video_id}/maxresdefault.jpg"
-                    logger.info(f"Converted YouTube video URL to thumbnail: {url}")
-            
+                    normalized_url = f"https://i.ytimg.com/vi/{video_id}/maxresdefault.jpg"
+                    logger.info(f"Converted YouTube video URL to thumbnail: {normalized_url}")
+
             # Download image
             headers = {
                 "User-Agent": "Mozilla/5.0 (compatible; ThumbnailGenerator/1.0)"
             }
-            response = requests.get(url, headers=headers, timeout=30)
-            
+
+            response = requests.get(
+                normalized_url,
+                headers=headers,
+                timeout=30,
+                allow_redirects=False,
+                stream=True,
+            )
+
+            if response.status_code in (301, 302, 303, 307, 308):
+                location = response.headers.get("location")
+                if location and max_redirects > 0:
+                    next_url = urljoin(normalized_url, location)
+                    return self.download_image_from_url(next_url, max_redirects - 1)
+                return None, None
+
             if response.status_code != 200:
                 # Try fallback quality for YouTube
-                if "maxresdefault.jpg" in url:
+                if "maxresdefault.jpg" in normalized_url:
                     logger.info("Trying fallback thumbnail quality...")
-                    fallback_url = url.replace("maxresdefault.jpg", "hqdefault.jpg")
-                    return self.download_image_from_url(fallback_url)
+                    fallback_url = normalized_url.replace("maxresdefault.jpg", "hqdefault.jpg")
+                    return self.download_image_from_url(fallback_url, max_redirects)
                 return None, None
-            
+
             # Get MIME type
             mime_type = response.headers.get("content-type", "image/jpeg")
             if "jpeg" in mime_type or "jpg" in mime_type:
@@ -320,11 +343,27 @@ class ThumbnailGenerateHandler(BaseHandler):
                 mime_type = "image/webp"
             else:
                 mime_type = "image/jpeg"
+
+            content_length = response.headers.get("content-length")
+            if content_length and int(content_length) > MAX_IMAGE_BYTES:
+                logger.error("Reference thumbnail too large")
+                return None, None
+
+            total = 0
+            chunks: List[bytes] = []
+            for chunk in response.iter_content(chunk_size=8192):
+                if not chunk:
+                    continue
+                total += len(chunk)
+                if total > MAX_IMAGE_BYTES:
+                    logger.error("Reference thumbnail too large")
+                    return None, None
+                chunks.append(chunk)
+
+            image_bytes = b"".join(chunks)
+            image_base64 = base64.b64encode(image_bytes).decode("utf-8")
             
-            # Convert to base64
-            image_base64 = base64.b64encode(response.content).decode("utf-8")
-            
-            logger.info(f"Downloaded image: {len(response.content)} bytes, MIME: {mime_type}")
+            logger.info(f"Downloaded image: {len(image_bytes)} bytes, MIME: {mime_type}")
             
             return image_base64, mime_type
         except Exception as e:

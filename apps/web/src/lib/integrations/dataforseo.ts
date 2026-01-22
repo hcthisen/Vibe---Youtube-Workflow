@@ -46,10 +46,6 @@ class DataForSEOClient {
   private auth: string;
 
   constructor() {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/18d926b1-f741-4713-b147-77616fe448c6',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dataforseo.ts:50',message:'DataForSEO constructor called',data:{hasLogin:!!process.env.DATAFORSEO_LOGIN,hasPassword:!!process.env.DATAFORSEO_PASSWORD,allEnvKeys:Object.keys(process.env).filter(k=>k.includes('DATA'))},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B,D'})}).catch(()=>{});
-    // #endregion
-    
     const login = process.env.DATAFORSEO_LOGIN;
     const password = process.env.DATAFORSEO_PASSWORD;
 
@@ -371,10 +367,6 @@ class DataForSEOClient {
 
   async getVideoSubtitles(videoId: string): Promise<GetSubtitlesResult> {
     try {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/18d926b1-f741-4713-b147-77616fe448c6',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'subtitles-debug',hypothesisId:'A',location:'dataforseo.ts:getVideoSubtitles:entry',message:'fetching subtitles',data:{videoId},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
-
       // Use live endpoint for faster response (with required parameters from Python example)
       const result = await this.request<{
         status_code: number;
@@ -397,10 +389,6 @@ class DataForSEOClient {
           subtitles_language: "en",
         },
       ]);
-
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/18d926b1-f741-4713-b147-77616fe448c6',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'subtitles-debug',hypothesisId:'B',location:'dataforseo.ts:getVideoSubtitles:response',message:'DataForSEO subtitles response',data:{status_code:result.status_code,hasTasks:!!result.tasks,tasksLen:result.tasks?.length,hasResult:!!result.tasks?.[0]?.result,itemsLen:result.tasks?.[0]?.result?.[0]?.items?.length},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
 
       if (result.status_code !== 20000) {
         return {

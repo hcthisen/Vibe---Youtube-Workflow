@@ -5,6 +5,7 @@
  */
 
 import { createServiceClient } from "@/lib/supabase/service";
+import { validateExternalUrl } from "@/lib/security/external-url";
 
 export interface PoseResult {
   yaw: number;
@@ -57,6 +58,11 @@ export async function analyzePoseFromUrl(
 
     const supabase = await createServiceClient();
     const normalizedUrl = normalizeImageUrl(imageUrl);
+    const validation = await validateExternalUrl(normalizedUrl);
+    if (!validation.ok) {
+      console.warn(`analyzePoseFromUrl: blocked image_url (${validation.reason})`);
+      return null;
+    }
 
     // Create pose analysis job
     const { data: job, error: jobError } = await supabase

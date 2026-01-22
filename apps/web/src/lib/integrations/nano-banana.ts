@@ -3,6 +3,7 @@
  * 
  * Uses Google's Gemini API for image generation
  */
+import { validateExternalUrl } from "@/lib/security/external-url";
 
 interface GenerateThumbnailsParams {
   referenceImageUrl: string;
@@ -98,91 +99,122 @@ class NanoBananaClient {
   private async fetchImageAsBase64(url: string): Promise<{ data: string; mimeType: string } | null> {
     try {
       // Auto-convert YouTube video URLs to thumbnail URLs
-      const imageUrl = this.convertYouTubeUrlToThumbnail(url);
+      let imageUrl = this.convertYouTubeUrlToThumbnail(url);
       if (imageUrl !== url) {
         console.log(`Converted YouTube video URL to thumbnail: ${imageUrl}`);
       }
-      
-      console.log(`Fetching image from: ${imageUrl}`);
-      
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
-      
-      const response = await fetch(imageUrl, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; ThumbnailGenerator/1.0)',
-        },
-        signal: controller.signal,
-      });
-      
-      clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        console.error(`Failed to fetch image from ${imageUrl}: ${response.status} ${response.statusText}`);
-        
-        // If maxresdefault failed, try hqdefault
-        if (imageUrl.includes('maxresdefault.jpg')) {
-          console.log(`Trying fallback thumbnail quality...`);
-          const fallbackUrl = imageUrl.replace('maxresdefault.jpg', 'hqdefault.jpg');
-          return this.fetchImageAsBase64(fallbackUrl);
-        }
-        
-        return null;
-      }
 
-      const arrayBuffer = await response.arrayBuffer();
+      const maxRedirects = 3;
+      for (let attempt = 0; attempt <= maxRedirects; attempt += 1) {
+        const validation = await validateExternalUrl(imageUrl);
+        if (!validation.ok || !validation.normalizedUrl) {
+          console.error(`Blocked image URL: ${validation.reason}`);
+          return null;
+        }
+
+        console.log(`Fetching image from: ${validation.normalizedUrl}`);
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
+        let response: Response;
+        try {
+          response = await fetch(validation.normalizedUrl, {
+            headers: {
+              "User-Agent": "Mozilla/5.0 (compatible; ThumbnailGenerator/1.0)",
+            },
+            signal: controller.signal,
+            redirect: "manual",
+          });
+        } finally {
+          clearTimeout(timeoutId);
+        }
+
+        if (response.status >= 300 && response.status < 400) {
+          const location = response.headers.get("location");
+          if (!location) {
+            console.error(`Redirect missing location header: ${imageUrl}`);
+            return null;
+          }
+          imageUrl = new URL(location, validation.normalizedUrl).toString();
+          continue;
+        }
+
+        if (!response.ok) {
+          console.error(`Failed to fetch image from ${validation.normalizedUrl}: ${response.status} ${response.statusText}`);
+
+          // If maxresdefault failed, try hqdefault
+          if (validation.normalizedUrl.includes("maxresdefault.jpg")) {
+            console.log(`Trying fallback thumbnail quality...`);
+            const fallbackUrl = validation.normalizedUrl.replace("maxresdefault.jpg", "hqdefault.jpg");
+            return this.fetchImageAsBase64(fallbackUrl);
+          }
+
+          return null;
+        }
+
+        const arrayBuffer = await response.arrayBuffer();
       
       // Validate that we actually got image data
-      if (arrayBuffer.byteLength === 0) {
-        console.error(`Empty response from ${url}`);
-        return null;
-      }
+        if (arrayBuffer.byteLength === 0) {
+          console.error(`Empty response from ${validation.normalizedUrl}`);
+          return null;
+        }
 
       // Check file size (Gemini has limits, typically ~20MB per image)
       const sizeMB = arrayBuffer.byteLength / (1024 * 1024);
       console.log(`Fetched image: ${arrayBuffer.byteLength} bytes (${sizeMB.toFixed(2)} MB)`);
       
-      if (sizeMB > 20) {
-        console.error(`Image too large: ${sizeMB.toFixed(2)} MB (max 20 MB)`);
-        return null;
-      }
+        if (sizeMB > 20) {
+          console.error(`Image too large: ${sizeMB.toFixed(2)} MB (max 20 MB)`);
+          return null;
+        }
       
-      const buffer = Buffer.from(arrayBuffer);
-      const base64 = buffer.toString('base64');
+        const buffer = Buffer.from(arrayBuffer);
+        const base64 = buffer.toString("base64");
       
       // Validate base64 encoding
-      if (!base64 || base64.length === 0) {
-        console.error(`Failed to encode image to base64`);
-        return null;
-      }
+        if (!base64 || base64.length === 0) {
+          console.error(`Failed to encode image to base64`);
+          return null;
+        }
       
       // Determine MIME type from content-type header
-      let mimeType = response.headers.get('content-type') || '';
+        let mimeType = response.headers.get("content-type") || "";
       
       // Validate and normalize MIME type
-      if (mimeType.includes('image/jpeg') || mimeType.includes('image/jpg')) {
-        mimeType = 'image/jpeg';
-      } else if (mimeType.includes('image/png')) {
-        mimeType = 'image/png';
-      } else if (mimeType.includes('image/webp')) {
-        mimeType = 'image/webp';
-      } else {
-        // Fallback based on URL extension
-        const lowerUrl = imageUrl.toLowerCase();
-        if (lowerUrl.includes('.png') || lowerUrl.includes('png')) {
-          mimeType = 'image/png';
-        } else if (lowerUrl.includes('.webp') || lowerUrl.includes('webp')) {
-          mimeType = 'image/webp';
-        } else if (lowerUrl.includes('.jpg') || lowerUrl.includes('.jpeg') || lowerUrl.includes('jpg') || lowerUrl.includes('jpeg')) {
-          mimeType = 'image/jpeg';
+        if (mimeType.includes("image/jpeg") || mimeType.includes("image/jpg")) {
+          mimeType = "image/jpeg";
+        } else if (mimeType.includes("image/png")) {
+          mimeType = "image/png";
+        } else if (mimeType.includes("image/webp")) {
+          mimeType = "image/webp";
         } else {
-          mimeType = 'image/jpeg'; // Default to JPEG
+          // Fallback based on URL extension
+          const lowerUrl = validation.normalizedUrl.toLowerCase();
+          if (lowerUrl.includes(".png") || lowerUrl.includes("png")) {
+            mimeType = "image/png";
+          } else if (lowerUrl.includes(".webp") || lowerUrl.includes("webp")) {
+            mimeType = "image/webp";
+          } else if (
+            lowerUrl.includes(".jpg") ||
+            lowerUrl.includes(".jpeg") ||
+            lowerUrl.includes("jpg") ||
+            lowerUrl.includes("jpeg")
+          ) {
+            mimeType = "image/jpeg";
+          } else {
+            mimeType = "image/jpeg"; // Default to JPEG
+          }
         }
+
+        console.log(`Image MIME type: ${mimeType}, base64 length: ${base64.length}`);
+
+        return { data: base64, mimeType };
       }
 
-      console.log(`Image MIME type: ${mimeType}, base64 length: ${base64.length}`);
-
-      return { data: base64, mimeType };
+      console.error(`Too many redirects while fetching image: ${imageUrl}`);
+      return null;
     } catch (error) {
       console.error(`Error fetching image from ${url}:`, error);
       return null;

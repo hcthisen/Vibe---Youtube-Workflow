@@ -12,8 +12,8 @@ pydub==0.25.1
 librosa==0.10.1
 
 # Silero VAD (Neural Voice Activity Detection)
-torch==2.1.2
-torchaudio==2.1.2
+torch==2.8.0
+torchaudio==2.8.0
 
 # Transcription (using openai-whisper only - simpler, no native deps)
 openai-whisper==20231117
@@ -25,11 +25,11 @@ openai==1.12.0
 mediapipe==0.10.9
 opencv-python==4.9.0.80
 numpy==1.26.3
-Pillow==10.2.0
+Pillow==10.3.0
 
 # HTTP
 httpx==0.27.0
-requests==2.31.0
+requests==2.32.4
 
 # Utilities
 python-dotenv==1.0.0

@@ -10,6 +10,7 @@ import type {
 import { getNanoBananaClient } from "@/lib/integrations/nano-banana";
 import { createServiceClient } from "@/lib/supabase/service";
 import { analyzePoseFromUrl, findBestMatchingHeadshot } from "@/lib/integrations/pose-analysis";
+import { validateExternalUrl } from "@/lib/security/external-url";
 
 // Pose bucket calculation
 function getPoseBucket(yaw: number, pitch: number): string {
@@ -78,6 +79,15 @@ export async function headshotPoseAnalyzeHandler(
       }
     }
 
+    let imageUrl = input.image_url;
+    if (imageUrl) {
+      const validation = await validateExternalUrl(imageUrl);
+      if (!validation.ok) {
+        return { success: false, error: validation.reason || "Invalid image_url", logs };
+      }
+      imageUrl = validation.normalizedUrl || imageUrl;
+    }
+
     // Enqueue a pose analysis job for the Python worker (real analysis)
     logs.push("Enqueuing pose analysis job...");
     const { data: job, error: jobError } = await supabase
@@ -88,7 +98,7 @@ export async function headshotPoseAnalyzeHandler(
         status: "queued",
         input: input.headshot_id
           ? { headshot_id: input.headshot_id }
-          : { image_url: input.image_url },
+          : { image_url: imageUrl },
       })
       .select("id, status")
       .single();

@@ -13,7 +13,8 @@
     "build": "npm run build --workspace=apps/web",
     "start": "npm run start --workspace=apps/web",
     "lint": "npm run lint --workspace=apps/web",
-    "db:migrate": "npm run db:migrate --workspace=apps/web"
+    "db:migrate": "npm run db:migrate --workspace=apps/web",
+    "security:check": "node scripts/security/check-guards.js"
   },
   "engines": {
     "node": ">=20.0.0"
