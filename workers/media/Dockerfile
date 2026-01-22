@@ -42,7 +42,10 @@ WORKDIR /app
 
 # Copy requirements first for better Docker layer caching
 COPY workers/media/requirements.txt ./workers/media/
-RUN pip install --no-cache-dir -r workers/media/requirements.txt
+# Use the PyTorch CPU wheels index to ensure torch/torchaudio resolve on slim images
+RUN pip install --no-cache-dir \
+    --extra-index-url https://download.pytorch.org/whl/cpu \
+    -r workers/media/requirements.txt
 
 # Copy worker code
 COPY workers/media/ ./workers/media/
