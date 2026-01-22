@@ -166,6 +166,7 @@ class OpenAIClient {
         body: JSON.stringify({
           model,
           input,
+          temperature: options.temperature ?? 0.7,
           text: {
             format: {
               type: options.responseJsonSchema ? "json_schema" : "json_object",
@@ -192,15 +193,50 @@ class OpenAIClient {
         throw new Error(`OpenAI API error: ${response.status} ${error}`);
       }
 
-      const data = await response.json();
-      const content = data.output?.[0]?.content?.[0];
-      if (content?.json) {
-        return JSON.stringify(content.json);
+      let data: any;
+      try {
+        data = await response.json();
+      } catch (e) {
+        const raw = await response.text().catch(() => "");
+        const sample = raw.substring(0, 300).replace(/\n/g, " ");
+        throw new Error(
+          `Failed to parse JSON from OpenAI responses API. Response sample: ${sample}...`
+        );
       }
-      if (content?.text) {
-        return content.text;
+
+      // Robustly extract text/json from the Responses API shape.
+      // Prefer any explicit json payload if present, otherwise collect output_text.
+      const outputItems: any[] = Array.isArray(data?.output) ? data.output : [];
+      const contentItems: any[] = outputItems.flatMap((item) =>
+        Array.isArray(item?.content) ? item.content : []
+      );
+
+      const firstJson = contentItems.find((c) => c && typeof c === "object" && c.json != null);
+      if (firstJson?.json != null) {
+        return JSON.stringify(firstJson.json);
       }
-      return data.output_text || "";
+
+      const refusal = contentItems.find((c) => c && typeof c === "object" && typeof c.refusal === "string");
+      if (refusal?.refusal) {
+        throw new Error(`OpenAI refused the request: ${refusal.refusal}`);
+      }
+
+      const textParts = contentItems
+        .map((c) => (c && typeof c === "object" ? c.text : null))
+        .filter((t): t is string => typeof t === "string" && t.length > 0);
+
+      if (textParts.length > 0) {
+        return textParts.join("");
+      }
+
+      if (typeof data?.output_text === "string" && data.output_text.length > 0) {
+        return data.output_text;
+      }
+
+      const debugSample = JSON.stringify(data).substring(0, 300);
+      throw new Error(
+        `OpenAI response did not contain any extractable text/json. Response sample: ${debugSample}...`
+      );
     } else {
       // Use legacy GPT-4 API (chat completions endpoint)
       const response = await fetch(`${this.baseUrl}/chat/completions`, {
@@ -261,7 +297,7 @@ class OpenAIClient {
         }
       }
       // Include a sample of the response to help debug
-      const sample = response.substring(0, 300).replace(/\n/g, ' ');
+      const sample = (response || "[empty]").substring(0, 300).replace(/\n/g, " ");
       throw new Error(`Failed to parse JSON response from OpenAI. Response sample: ${sample}...`);
     }
   }
@@ -378,7 +414,31 @@ Respond with a JSON object: { "ideas": [...] }`;
         }
       );
 
-      const parsed = this.parseJsonResponse<{ ideas: IdeaResult[] }>(response);
+      let parsed: { ideas: IdeaResult[] };
+      try {
+        parsed = this.parseJsonResponse<{ ideas: IdeaResult[] }>(response);
+      } catch (e) {
+        // If we got truncated / invalid JSON, retry by splitting into smaller batches.
+        // This is only used as a fallback for robustness.
+        const message = e instanceof Error ? e.message : String(e);
+        if (params.count > 3 && message.includes("Failed to parse JSON response from OpenAI")) {
+          const leftCount = Math.ceil(params.count / 2);
+          const rightCount = params.count - leftCount;
+
+          const left = await this.generateIdeas({ ...params, count: leftCount });
+          if (!left.success) return left;
+
+          if (rightCount <= 0) {
+            return { success: true, ideas: left.ideas };
+          }
+
+          const right = await this.generateIdeas({ ...params, count: rightCount });
+          if (!right.success) return right;
+
+          return { success: true, ideas: [...left.ideas, ...right.ideas] };
+        }
+        throw e;
+      }
 
       return {
         success: true,
