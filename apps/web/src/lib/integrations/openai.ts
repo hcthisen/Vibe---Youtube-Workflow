@@ -144,6 +144,9 @@ class OpenAIClient {
   ): Promise<string> {
     const model = options.model || this.model;
     const isGPT5 = model.startsWith("gpt-5");
+    const isGPT51or52 = model.startsWith("gpt-5.1") || model.startsWith("gpt-5.2");
+    const configuredReasoningEffort = process.env.OPENAI_REASONING_EFFORT;
+    const configuredVerbosity = process.env.OPENAI_TEXT_VERBOSITY;
 
     if (isGPT5) {
       // Use new GPT-5 API (responses endpoint)
@@ -157,35 +160,58 @@ class OpenAIClient {
         ],
       }));
 
+      const effectiveReasoningEffort =
+        configuredReasoningEffort && configuredReasoningEffort.trim().length > 0
+          ? configuredReasoningEffort.trim()
+          : // GPT-5.2/5.1 default to none; older GPT-5 models default to medium.
+            isGPT51or52
+            ? "none"
+            : undefined;
+
+      // Per GPT-5.2 guide: temperature/top_p/logprobs are only supported when reasoning effort is none.
+      const canUseSampling =
+        isGPT51or52 && (effectiveReasoningEffort === "none" || effectiveReasoningEffort === undefined);
+
+      const requestBody: Record<string, unknown> = {
+        model,
+        input,
+        text: {
+          format: {
+            type: options.responseJsonSchema ? "json_schema" : "json_object",
+            ...(options.responseJsonSchema
+              ? {
+                  name: options.responseJsonSchema.name,
+                  schema: options.responseJsonSchema.schema,
+                  strict: options.responseJsonSchema.strict ?? true,
+                }
+              : {}),
+          },
+          verbosity:
+            configuredVerbosity && configuredVerbosity.trim().length > 0
+              ? configuredVerbosity.trim()
+              : "medium",
+        },
+        max_output_tokens: options.maxTokens ?? 4096,
+      };
+
+      if (effectiveReasoningEffort !== undefined) {
+        requestBody.reasoning = {
+          effort: effectiveReasoningEffort,
+          summary: "auto",
+        };
+      }
+
+      if (canUseSampling && typeof options.temperature === "number") {
+        requestBody.temperature = options.temperature;
+      }
+
       const response = await fetch(`${this.baseUrl}/responses`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${this.apiKey}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          model,
-          input,
-          temperature: options.temperature ?? 0.7,
-          text: {
-            format: {
-              type: options.responseJsonSchema ? "json_schema" : "json_object",
-              ...(options.responseJsonSchema
-                ? {
-                    name: options.responseJsonSchema.name,
-                    schema: options.responseJsonSchema.schema,
-                    strict: options.responseJsonSchema.strict ?? true,
-                  }
-                : {}),
-            },
-            verbosity: "low", // Minimize extra text
-          },
-          reasoning: {
-            effort: "medium",
-            summary: "auto",
-          },
-          max_output_tokens: options.maxTokens ?? 4096,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
