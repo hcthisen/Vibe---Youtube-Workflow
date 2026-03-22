@@ -9,6 +9,7 @@ import subprocess
 
 from .base import BaseHandler
 from config import Config
+from utils.languages import normalize_language_code
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,9 @@ class TranscribeHandler(BaseHandler):
         """Transcribe a video."""
         try:
             asset_id = input_data.get("asset_id")
+            language_code = normalize_language_code(
+                input_data.get("language_code") or input_data.get("language")
+            )
 
             # Get asset info
             asset = self.supabase.table("project_assets").select("*").eq(
@@ -77,7 +81,11 @@ class TranscribeHandler(BaseHandler):
                 # Transcribe
                 logger.info("Transcribing audio")
                 model = self._load_model()
-                result = model.transcribe(audio_path, verbose=False)
+                transcribe_kwargs = {"verbose": False}
+                if language_code:
+                    transcribe_kwargs["language"] = language_code
+
+                result = model.transcribe(audio_path, **transcribe_kwargs)
 
                 # Format transcript
                 segments = []
@@ -122,6 +130,7 @@ class TranscribeHandler(BaseHandler):
                     metadata={
                         "source_asset_id": asset_id,
                         "language": transcript["language"],
+                        "requested_language": language_code,
                         "segment_count": len(segments),
                     }
                 )
@@ -147,4 +156,3 @@ class TranscribeHandler(BaseHandler):
         except Exception as e:
             logger.exception("Transcription failed")
             return {"success": False, "error": str(e)}
-

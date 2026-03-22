@@ -18,6 +18,7 @@ from utils.audio_normalization import (
     DEFAULT_TRUE_PEAK,
     DEFAULT_LRA,
 )
+from utils.languages import normalize_language_code
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,9 @@ class VideoProcessHandler(BaseHandler):
             retake_detection_enabled = input_data.get("retake_detection_enabled", False)
             retake_markers = input_data.get("retake_markers", [])
             apply_intro_transition = input_data.get("apply_intro_transition", False)
+            language_code = normalize_language_code(
+                input_data.get("language_code") or input_data.get("transcript_language")
+            )
             
             # Enhanced retake detection settings
             retake_context_window = input_data.get("retake_context_window_seconds", 30)
@@ -110,16 +114,22 @@ class VideoProcessHandler(BaseHandler):
                 logger.info("Step 2: Transcription")
                 transcription_result = transcribe_video(
                     video_path=vad_output_path,
-                    model_name="base"
+                    model_name="base",
+                    language=language_code,
                 )
 
                 if not transcription_result["success"]:
                     logger.warning(f"Transcription failed: {transcription_result.get('error')}")
                     transcript_words = []
                     transcript_plaintext = ""
+                    transcript_language_detected = language_code
                 else:
                     transcript_words = transcription_result["words"]
                     transcript_plaintext = transcription_result["plaintext"]
+                    transcript_language_detected = transcription_result.get(
+                        "language",
+                        language_code,
+                    )
 
                 # ===== STEP 3: Retake Marker Detection & LLM Cuts (if enabled) =====
                 retake_cuts = []
@@ -285,7 +295,9 @@ class VideoProcessHandler(BaseHandler):
                             path=transcript_json_path,
                             metadata={
                                 "format": "json",
-                                "word_count": len(transcript_words)
+                                "word_count": len(transcript_words),
+                                "language": transcript_language_detected,
+                                "requested_language": language_code,
                             }
                         )
                     
@@ -312,7 +324,9 @@ class VideoProcessHandler(BaseHandler):
                             path=transcript_txt_path,
                             metadata={
                                 "format": "plaintext",
-                                "word_count": len(transcript_words)
+                                "word_count": len(transcript_words),
+                                "language": transcript_language_detected,
+                                "requested_language": language_code,
                             }
                         )
 
@@ -353,6 +367,8 @@ class VideoProcessHandler(BaseHandler):
                     },
                     "transcript_word_count": len(transcript_words),
                     "transcript_words_removed": transcription_result.get("word_count", 0) - len(transcript_words),
+                    "transcript_language": transcript_language_detected,
+                    "requested_language": language_code,
                     "processing_steps": [
                         "vad_silence_removal",
                         "transcription",

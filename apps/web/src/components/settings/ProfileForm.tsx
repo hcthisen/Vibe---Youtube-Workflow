@@ -3,6 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import {
+  PROJECT_LANGUAGE_OPTIONS,
+  normalizeProjectLanguageCode,
+} from "@/lib/project-language";
 
 interface ProfileFormProps {
   profile: {
@@ -31,8 +35,8 @@ export function ProfileForm({ profile, userId }: ProfileFormProps) {
     silence_threshold_ms: profile?.silence_threshold_ms || 500,
     retake_markers: (profile?.retake_markers as string[])?.join(", ") || "",
     intro_transition_enabled: profile?.intro_transition_enabled || false,
-    default_language_code: profile?.default_language_code || "en",
-    default_location_code: profile?.default_location_code || 2840,
+    default_language_code: normalizeProjectLanguageCode(profile?.default_language_code || "da"),
+    default_location_code: profile?.default_location_code || 2208,
     retake_detection_enabled: profile?.retake_detection_enabled || false,
     retake_context_window_seconds: profile?.retake_context_window_seconds || 30,
     retake_min_confidence: profile?.retake_min_confidence || 0.7,
@@ -261,15 +265,11 @@ export function ProfileForm({ profile, userId }: ProfileFormProps) {
               onChange={(e) => setFormData({ ...formData, default_language_code: e.target.value })}
               className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors"
             >
-              <option value="en">English</option>
-              <option value="es">Spanish</option>
-              <option value="fr">French</option>
-              <option value="de">German</option>
-              <option value="pt">Portuguese</option>
-              <option value="it">Italian</option>
-              <option value="ja">Japanese</option>
-              <option value="ko">Korean</option>
-              <option value="zh">Chinese</option>
+              {PROJECT_LANGUAGE_OPTIONS.map((language) => (
+                <option key={language.code} value={language.code}>
+                  {language.label}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -284,6 +284,7 @@ export function ProfileForm({ profile, userId }: ProfileFormProps) {
               }
               className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors"
             >
+              <option value={2208}>Denmark</option>
               <option value={2840}>United States</option>
               <option value={2826}>United Kingdom</option>
               <option value={2124}>Canada</option>

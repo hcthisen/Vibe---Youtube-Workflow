@@ -28,7 +28,7 @@ export async function POST(
 
     const { data: project, error: projectError } = await supabase
       .from("projects")
-      .select("id")
+      .select("id, language_code")
       .eq("id", projectId)
       .eq("user_id", user.id)
       .single();
@@ -39,6 +39,7 @@ export async function POST(
 
     const result = await getOpenAIClient().generateYouTubeDescription({
       transcript,
+      languageCode: project.language_code,
     });
 
     if (!result.success) {

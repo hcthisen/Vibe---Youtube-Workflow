@@ -12,6 +12,7 @@ from typing import Dict, Any, List, Optional
 import requests
 from supabase import Client
 from .base import BaseHandler
+from utils.languages import get_language_name, normalize_language_code
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,7 @@ class ThumbnailIterateHandler(BaseHandler):
             text_modifications = input_data.get("text_modifications")
             refinement_prompt = input_data.get("refinement_prompt")
             idea_brief_markdown = input_data.get("idea_brief_markdown")
+            language_code = normalize_language_code(input_data.get("language_code"))
             count = input_data.get("count", 2)
             
             if not project_id:
@@ -40,13 +42,14 @@ class ThumbnailIterateHandler(BaseHandler):
             logger.info(f"Iterating on thumbnail {previous_thumbnail_asset_id} for project {project_id}")
         
             # Step 1: Get project details
-            project = self.supabase.table("projects").select("title, user_id").eq("id", project_id).single().execute()
+            project = self.supabase.table("projects").select("title, user_id, language_code").eq("id", project_id).single().execute()
             if not project.data:
                 return {"success": False, "error": f"Project {project_id} not found"}
             
             project_data = project.data
             user_id = project_data["user_id"]
             title = project_data["title"]
+            language_code = normalize_language_code(project_data.get("language_code") or language_code)
             
             # Step 2: Get user profile for display name
             profile = self.supabase.table("profiles").select("display_name").eq("id", user_id).single().execute()
@@ -108,7 +111,8 @@ class ThumbnailIterateHandler(BaseHandler):
                 title=title,
                 refinement_prompt=refinement_prompt,
                 text_modifications=text_modifications,
-                idea_brief_markdown=idea_brief_markdown
+                idea_brief_markdown=idea_brief_markdown,
+                language_code=language_code,
             )
             
             # Step 6: Generate iterated thumbnails via Gemini API
@@ -158,6 +162,7 @@ class ThumbnailIterateHandler(BaseHandler):
                         "refinement_prompt": refinement_prompt,
                         "text_modifications": text_modifications,
                         "idea_brief_markdown": idea_brief_markdown,
+                        "language_code": language_code,
                         "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime())
                     }
                 }).execute()
@@ -203,10 +208,12 @@ class ThumbnailIterateHandler(BaseHandler):
         title: str,
         refinement_prompt: str,
         text_modifications: Optional[str],
-        idea_brief_markdown: Optional[str]
+        idea_brief_markdown: Optional[str],
+        language_code: str,
     ) -> str:
         """Build the prompt for thumbnail iteration"""
         user_name = user_name or "the person"
+        language_name = get_language_name(language_code)
         
         prompt = f"""IMAGE 1: Reference photo of {user_name}'s face (if provided).
 IMAGE 2: The thumbnail to refine.
@@ -216,6 +223,7 @@ TASK: Refine the thumbnail based on the following instructions:
 {refinement_prompt}
 
 Video title context: "{title}"
+Any headline or overlaid text must be written in {language_name} ({language_code}).
 
 {f'Text changes (follow exactly): {text_modifications}' if text_modifications else 'TEXT TASK: Replace the main headline text to match the Idea Brief (prefer any "Thumbnail Text Ideas" list inside it). Do NOT keep the existing headline unless it matches.'}
 """
@@ -312,4 +320,3 @@ When adding or modifying text on the thumbnail, ensure it aligns with the core c
                 logger.error(f"Failed to generate iterated thumbnail {i+1}: {e}")
         
         return generated_images
-

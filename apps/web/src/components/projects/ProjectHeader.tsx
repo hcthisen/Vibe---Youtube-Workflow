@@ -3,9 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { getProjectLanguageName } from "@/lib/project-language";
 
 interface Project {
   id: string;
+  language_code: string;
   title: string;
   status: string;
   created_at: string;
@@ -115,6 +117,8 @@ export function ProjectHeader({ project }: ProjectHeaderProps) {
         <div className="flex items-center gap-4 mt-2 text-sm text-gray-400">
           <span className={status.color}>{status.label}</span>
           <span>•</span>
+          <span>{getProjectLanguageName(project.language_code)}</span>
+          <span>•</span>
           <span>Created {new Date(project.created_at).toLocaleDateString()}</span>
         </div>
       </div>
@@ -155,4 +159,3 @@ export function ProjectHeader({ project }: ProjectHeaderProps) {
     </div>
   );
 }
-

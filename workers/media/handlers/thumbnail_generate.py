@@ -9,6 +9,7 @@ from urllib.parse import urljoin
 import requests
 from supabase import Client
 from .base import BaseHandler
+from utils.languages import get_language_name, normalize_language_code
 from utils.url_safety import validate_external_url
 
 logger = logging.getLogger(__name__)
@@ -65,6 +66,7 @@ class ThumbnailGenerateHandler(BaseHandler):
             text_modifications = input_data.get("text_modifications")
             prompt_additions = input_data.get("prompt_additions")
             idea_brief_markdown = input_data.get("idea_brief_markdown")
+            language_code = normalize_language_code(input_data.get("language_code"))
             count = input_data.get("count", 2)
             
             # Summarize idea brief if too long to avoid token limits
@@ -89,13 +91,14 @@ class ThumbnailGenerateHandler(BaseHandler):
             logger.info(f"Generating {count} thumbnails for project {project_id}")
         
             # Step 1: Get project details
-            project = self.supabase.table("projects").select("title, user_id").eq("id", project_id).single().execute()
+            project = self.supabase.table("projects").select("title, user_id, language_code").eq("id", project_id).single().execute()
             if not project.data:
                 return {"success": False, "error": f"Project {project_id} not found"}
             
             project_data = project.data
             user_id = project_data["user_id"]
             title = project_data["title"]
+            language_code = normalize_language_code(project_data.get("language_code") or language_code)
             
             # Step 2: Get user profile for display name
             profile = self.supabase.table("profiles").select("display_name").eq("id", user_id).single().execute()
@@ -130,7 +133,8 @@ class ThumbnailGenerateHandler(BaseHandler):
                 title=title,
                 text_modifications=text_modifications,
                 prompt_additions=prompt_additions,
-                idea_brief_markdown=idea_brief_markdown
+                idea_brief_markdown=idea_brief_markdown,
+                language_code=language_code,
             )
             
             # Step 6: Generate thumbnails via Gemini API
@@ -181,6 +185,7 @@ class ThumbnailGenerateHandler(BaseHandler):
                         "prompt_additions": prompt_additions,
                         "text_modifications": text_modifications,
                         "idea_brief_markdown": idea_brief_markdown,
+                        "language_code": language_code,
                         "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime())
                     }
                 }, returning="representation").execute()
@@ -389,10 +394,12 @@ class ThumbnailGenerateHandler(BaseHandler):
         title: str,
         text_modifications: Optional[str],
         prompt_additions: Optional[str],
-        idea_brief_markdown: Optional[str]
+        idea_brief_markdown: Optional[str],
+        language_code: str,
     ) -> str:
         """Build the prompt for face swap thumbnail generation"""
         user_name = user_name or "the person"
+        language_name = get_language_name(language_code)
 
         text_ideas = _extract_thumbnail_text_ideas(idea_brief_markdown)
 
@@ -404,6 +411,7 @@ TASK: Replace ONLY the face in the thumbnail with {user_name}'s exact face from 
 Keep the composition, background, colors, and layout identical to IMAGE 2.
 
 Video title context: "{title}"
+Any headline or overlaid text must be written in {language_name} ({language_code}).
 """
 
         if text_modifications and text_modifications.strip():
@@ -538,4 +546,3 @@ Use this brief to decide what headline text should be on the thumbnail (prefer t
             raise Exception(last_error)
             
         return generated_images
-

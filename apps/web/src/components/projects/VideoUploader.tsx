@@ -186,9 +186,9 @@ export function VideoUploader({ projectId }: VideoUploaderProps) {
       )}
 
       <p className="text-sm text-gray-400 text-center">
-        Your video will be automatically processed to remove silence and generate a transcript.
+        Your video will be automatically processed to remove silence and generate a transcript
+        using the project language.
       </p>
     </div>
   );
 }
-

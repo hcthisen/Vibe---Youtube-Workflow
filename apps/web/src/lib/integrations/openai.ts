@@ -4,6 +4,11 @@
  * Uses OpenAI for text generation (outlines, titles, ideas, summaries)
  */
 
+import {
+  getProjectLanguageName,
+  normalizeProjectLanguageCode,
+} from "@/lib/project-language";
+
 interface GenerateIdeasParams {
   baselineContext: string;
   baselineKeywords: string[];
@@ -32,6 +37,7 @@ interface GenerateOutlineParams {
   title: string;
   context: string;
   existingHooks: string[];
+  languageCode?: string;
 }
 
 interface GenerateOutlineResult {
@@ -44,6 +50,7 @@ interface GenerateTitlesParams {
   currentTitle: string;
   context: string;
   count: number;
+  languageCode?: string;
 }
 
 interface TitleVariant {
@@ -74,6 +81,7 @@ interface GenerateSummaryResult {
 
 interface GenerateYouTubeDescriptionParams {
   transcript: string;
+  languageCode?: string;
 }
 
 interface GenerateYouTubeDescriptionResult {
@@ -111,6 +119,18 @@ interface GenerateAdaptedIdeaResult {
   why_now: string;
   hook_options: string[];
   thumbnail_text_ideas: string[];
+  error?: string;
+}
+
+interface TranslateProjectMarkdownParams {
+  markdown: string;
+  languageCode: string;
+  documentName: string;
+}
+
+interface TranslateProjectMarkdownResult {
+  success: boolean;
+  markdown: string;
   error?: string;
 }
 
@@ -328,6 +348,14 @@ class OpenAIClient {
     }
   }
 
+  private getTargetLanguage(languageCode?: string) {
+    const code = normalizeProjectLanguageCode(languageCode);
+    return {
+      code,
+      name: getProjectLanguageName(code),
+    };
+  }
+
   private extractJsonCandidate(response: string): string | null {
     const text = response.trim();
     if (!text) return null;
@@ -481,6 +509,7 @@ Respond with a JSON object: { "ideas": [...] }`;
 
   async generateOutline(params: GenerateOutlineParams): Promise<GenerateOutlineResult> {
     try {
+      const targetLanguage = this.getTargetLanguage(params.languageCode);
       const systemPrompt = `You are a YouTube scriptwriter. Generate a High Level video outline.
 You must respond with valid JSON only.`;
 
@@ -492,6 +521,8 @@ ${params.context}
 ${params.existingHooks.length > 0 ? `Existing hook ideas to consider: ${params.existingHooks.join(", ")}` : ""}
 
 Use the Idea Brief section (if present in the context) as your primary source of truth.
+Write the full outline in ${targetLanguage.name} (${targetLanguage.code}).
+Do not switch back to English except for proper nouns or direct source quotes.
 
 The outline should follow this exact format:
 2-3 Different opening hooks
@@ -536,6 +567,7 @@ Respond with JSON: { "markdown": "your markdown string here" }`;
 
   async generateTitles(params: GenerateTitlesParams): Promise<GenerateTitlesResult> {
     try {
+      const targetLanguage = this.getTargetLanguage(params.languageCode);
       const systemPrompt = `You are a YouTube title expert. Generate compelling, click-worthy titles.
 You must respond with valid JSON only.`;
 
@@ -556,6 +588,8 @@ For each title provide:
 - title: The title text (max 60 chars)
 - style: One of the styles above
 - reasoning: Brief explanation of why it works
+
+Write every title and reasoning in ${targetLanguage.name} (${targetLanguage.code}).
 
 Respond with JSON: { "title_variants": [...] }`;
 
@@ -648,6 +682,7 @@ Respond with ONLY this exact JSON structure:
     params: GenerateYouTubeDescriptionParams
   ): Promise<GenerateYouTubeDescriptionResult> {
     try {
+      const targetLanguage = this.getTargetLanguage(params.languageCode);
       const systemPrompt = `You are a YouTube copywriter. Write a short, natural description based on the transcript.
 You must respond with valid JSON only.`;
 
@@ -658,6 +693,7 @@ Constraints:
 - Keep it punchy and personal
 - Do not add hashtags
 - Do not invent links or credits unless explicitly stated in the transcript
+- Write the description in ${targetLanguage.name} (${targetLanguage.code})
 
 Transcript:
 ${params.transcript}
@@ -824,6 +860,52 @@ Respond with JSON: { "title_concept": "...", "thesis": "...", "why_now": "...", 
       };
     }
   }
+
+  async translateProjectMarkdown(
+    params: TranslateProjectMarkdownParams
+  ): Promise<TranslateProjectMarkdownResult> {
+    try {
+      const targetLanguage = this.getTargetLanguage(params.languageCode);
+      const response = await this.chat(
+        [
+          {
+            role: "system",
+            content:
+              "You translate creator planning documents while preserving Markdown structure. You must respond with valid JSON only.",
+          },
+          {
+            role: "user",
+            content: `Translate this ${params.documentName} into ${targetLanguage.name} (${targetLanguage.code}).
+
+Requirements:
+- Preserve Markdown structure and heading levels
+- Translate headings, labels, numbered items, bullets, and prose
+- Keep URLs unchanged
+- Keep proper nouns unchanged unless there is a standard localized form
+
+Markdown:
+${params.markdown}
+
+Respond with JSON: { "markdown": "..." }`,
+          },
+        ],
+        { temperature: 0.2, maxTokens: 2400 }
+      );
+
+      const parsed = this.parseJsonResponse<{ markdown: string }>(response);
+
+      return {
+        success: true,
+        markdown: parsed.markdown || params.markdown,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        markdown: params.markdown,
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  }
 }
 
 let _openaiClient: OpenAIClient | null = null;
@@ -840,4 +922,3 @@ export function getOpenAIClient(): OpenAIClient {
   }
   return _openaiClient;
 }
-

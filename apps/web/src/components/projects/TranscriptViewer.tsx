@@ -2,12 +2,16 @@
 
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { getProjectLanguageName } from "@/lib/project-language";
 
 interface Asset {
   id: string;
   bucket: string;
   path: string;
-  metadata: unknown;
+  metadata: {
+    language?: string;
+    requested_language?: string;
+  } | null;
 }
 
 interface TranscriptSegment {
@@ -55,7 +59,10 @@ export function TranscriptViewer({ asset, projectId, initialDescription }: Trans
     setDraftDescription(initialDescription || "");
   }, [initialDescription]);
 
-  const convertWordLevelToSegments = (words: WordLevelTranscript[]): Transcript => {
+  const convertWordLevelToSegments = (
+    words: WordLevelTranscript[],
+    language: string
+  ): Transcript => {
     const segments: TranscriptSegment[] = [];
     let currentSegment: TranscriptSegment | null = null;
     const segmentGap = 1.0; // 1 second gap creates new segment
@@ -84,7 +91,7 @@ export function TranscriptViewer({ asset, projectId, initialDescription }: Trans
     return {
       segments,
       full_text: words.map(w => w.word).join(" "),
-      language: "en"
+      language,
     };
   };
 
@@ -99,7 +106,10 @@ export function TranscriptViewer({ asset, projectId, initialDescription }: Trans
         // Check if it's word-level format (array of {word, start, end})
         if (Array.isArray(parsed) && parsed.length > 0 && 'word' in parsed[0]) {
           // Convert word-level format to segment format
-          const converted = convertWordLevelToSegments(parsed);
+          const converted = convertWordLevelToSegments(
+            parsed,
+            asset.metadata?.language || asset.metadata?.requested_language || "en"
+          );
           setTranscript(converted);
         } else if (parsed.segments && parsed.full_text) {
           // Already in segment format
@@ -225,7 +235,7 @@ export function TranscriptViewer({ asset, projectId, initialDescription }: Trans
       </div>
 
       <div className="text-xs text-gray-500">
-        Language: {transcript.language}
+        Language: {getProjectLanguageName(transcript.language)}
       </div>
 
       {view === "full" ? (
@@ -347,4 +357,3 @@ export function TranscriptViewer({ asset, projectId, initialDescription }: Trans
     </div>
   );
 }
-

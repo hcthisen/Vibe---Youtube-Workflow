@@ -4,6 +4,9 @@
  * Documentation: https://docs.dataforseo.com/v3/serp/youtube/
  */
 
+const DEFAULT_LANGUAGE_CODE = "da";
+const DEFAULT_LOCATION_CODE = 2208;
+
 interface VideoResult {
   youtube_video_id: string;
   title: string;
@@ -163,8 +166,8 @@ class DataForSEOClient {
       }>("/serp/youtube/organic/live/advanced", [
         {
           keyword: channelName,
-          location_code: 2840, // USA
-          language_code: "en",
+          location_code: DEFAULT_LOCATION_CODE, // Denmark
+          language_code: DEFAULT_LANGUAGE_CODE,
           device: "desktop",
           os: "windows",
           block_depth: Math.min(200, Math.max(40, limit * 10)), // Fetch 10x limit to account for Shorts/dupes filtering
@@ -288,8 +291,8 @@ class DataForSEOClient {
       }>("/serp/youtube/organic/live/advanced", [
         {
           keyword: params.keywords.join(" "),
-          location_code: params.location_code || 2840, // USA
-          language_code: params.language_code || "en",
+          location_code: params.location_code || DEFAULT_LOCATION_CODE, // Denmark
+          language_code: params.language_code || DEFAULT_LANGUAGE_CODE,
           device: "desktop",
           os: "windows",
           block_depth: params.limit || 50, // Use block_depth, not depth
@@ -382,11 +385,11 @@ class DataForSEOClient {
       }>("/serp/youtube/video_subtitles/live/advanced", [
         {
           video_id: videoId,
-          location_code: 2840, // USA
-          language_code: "en",
+          location_code: DEFAULT_LOCATION_CODE, // Denmark
+          language_code: DEFAULT_LANGUAGE_CODE,
           os: "windows",
           depth: 20,
-          subtitles_language: "en",
+          subtitles_language: DEFAULT_LANGUAGE_CODE,
         },
       ]);
 
@@ -400,7 +403,7 @@ class DataForSEOClient {
       }
 
       const items = result.tasks?.[0]?.result?.[0]?.items || [];
-      const language = result.tasks?.[0]?.result?.[0]?.subtitle_language || "en";
+      const language = result.tasks?.[0]?.result?.[0]?.subtitle_language || DEFAULT_LANGUAGE_CODE;
 
       if (items.length === 0) {
         return {
@@ -456,4 +459,3 @@ export function getDataForSeoClient(): DataForSEOClient {
   }
   return _dataForSeoClient;
 }
-

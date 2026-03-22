@@ -242,7 +242,7 @@ export async function thumbnailGenerateFromReferenceHandler(
     // Verify project exists and belongs to user
     const { data: project, error: projectError } = await supabase
       .from("projects")
-      .select("id, title")
+      .select("id, title, language_code")
       .eq("id", input.project_id)
       .eq("user_id", context.userId)
       .single();
@@ -326,8 +326,9 @@ export async function thumbnailGenerateFromReferenceHandler(
           headshot_id: selectedHeadshotId,
           preset_style_id: input.preset_style_id,
           text_modifications: input.text_modifications,
-            prompt_additions: input.prompt_additions,
+          prompt_additions: input.prompt_additions,
           idea_brief_markdown: input.idea_brief_markdown,
+          language_code: project.language_code,
           count: input.count || 2,
         },
       })
@@ -373,7 +374,7 @@ export async function thumbnailIterateHandler(
     // Verify project exists and belongs to user
     const { data: project, error: projectError } = await supabase
       .from("projects")
-      .select("id, title")
+      .select("id, title, language_code")
       .eq("id", input.project_id)
       .eq("user_id", context.userId)
       .single();
@@ -426,6 +427,7 @@ export async function thumbnailIterateHandler(
           text_modifications: input.text_modifications,
           refinement_prompt: input.refinement_prompt,
           idea_brief_markdown: input.idea_brief_markdown,
+          language_code: project.language_code,
           count: input.count || 2,
         },
       })
@@ -455,4 +457,3 @@ export async function thumbnailIterateHandler(
     };
   }
 }
-

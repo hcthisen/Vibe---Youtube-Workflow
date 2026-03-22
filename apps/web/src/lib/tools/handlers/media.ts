@@ -23,7 +23,7 @@ export async function videoUploadFinalizeHandler(
     // Verify project exists and belongs to user
     const { data: project, error: projectError } = await supabase
       .from("projects")
-      .select("id")
+      .select("id, language_code")
       .eq("id", input.project_id)
       .eq("user_id", context.userId)
       .single();
@@ -93,6 +93,7 @@ export async function videoUploadFinalizeHandler(
           retake_detection_enabled: profile?.retake_detection_enabled || false,
           retake_markers: (profile?.retake_markers as any) || [],
           apply_intro_transition: profile?.intro_transition_enabled || false,
+          language_code: project.language_code,
           retake_context_window_seconds: profile?.retake_context_window_seconds || 30,
           retake_min_confidence: profile?.retake_min_confidence || 0.7,
           retake_prefer_sentence_boundaries: profile?.retake_prefer_sentence_boundaries ?? true,

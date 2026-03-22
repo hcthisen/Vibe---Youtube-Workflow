@@ -8,10 +8,25 @@ import type {
   ProjectGenerateTitlesOutput,
 } from "../schemas";
 import { getOpenAIClient } from "@/lib/integrations/openai";
+import { normalizeProjectLanguageCode } from "@/lib/project-language";
 import { createServiceClient } from "@/lib/supabase/service";
 import type { Database } from "@/lib/database.types";
 
 type ProjectRow = Database["public"]["Tables"]["projects"]["Row"];
+type IdeaWithVideo = {
+  ai_summary?: string | null;
+  hook_options?: string[] | null;
+  why_now?: string | null;
+  title_variants?: string[] | null;
+  search_queries_used?: string[] | null;
+  score?: number | null;
+  videos?: {
+    title?: string | null;
+    channel_name?: string | null;
+    views_count?: number | null;
+    youtube_video_id?: string | null;
+  } | null;
+};
 
 export async function projectCreateFromIdeaHandler(
   input: ProjectCreateFromIdeaInput,
@@ -37,8 +52,28 @@ export async function projectCreateFromIdeaHandler(
     }
 
     // Generate markdown brief from idea data
-    const ideaBriefMarkdown = generateIdeaBriefMarkdown(idea);
+    const languageCode = normalizeProjectLanguageCode(input.language_code);
+    let ideaBriefMarkdown = generateIdeaBriefMarkdown(idea as IdeaWithVideo);
     logs.push("Generated idea brief markdown");
+
+    if (languageCode !== "en") {
+      const localizedBrief = await getOpenAIClient().translateProjectMarkdown({
+        markdown: ideaBriefMarkdown,
+        languageCode,
+        documentName: "idea brief",
+      });
+
+      if (localizedBrief.success) {
+        ideaBriefMarkdown = localizedBrief.markdown;
+        logs.push(`Localized idea brief to ${languageCode}`);
+      } else {
+        return {
+          success: false,
+          error: localizedBrief.error || `Failed to localize idea brief to ${languageCode}`,
+          logs,
+        };
+      }
+    }
 
     // Create the project
     const { data: projectData, error: projectError } = await supabase
@@ -46,6 +81,7 @@ export async function projectCreateFromIdeaHandler(
       .insert({
         user_id: context.userId,
         idea_id: input.idea_id,
+        language_code: languageCode,
         title: input.title,
         status: "research",
         idea_brief_markdown: ideaBriefMarkdown,
@@ -87,7 +123,7 @@ export async function projectCreateFromIdeaHandler(
   }
 }
 
-function generateIdeaBriefMarkdown(idea: any): string {
+function generateIdeaBriefMarkdown(idea: IdeaWithVideo): string {
   const sections: string[] = [];
 
   sections.push("# Idea Brief\n");
@@ -201,6 +237,7 @@ export async function projectGenerateOutlineHandler(
       title: project.title,
       context: outlineContext,
       existingHooks: idea?.title_variants || [],
+      languageCode: project.language_code,
     });
 
     if (!result.success) {
@@ -264,8 +301,9 @@ export async function projectGenerateTitlesHandler(
 
     const result = await getOpenAIClient().generateTitles({
       currentTitle: project.title,
-      context: idea?.ai_summary || "",
+      context: [project.idea_brief_markdown, idea?.ai_summary].filter(Boolean).join("\n\n"),
       count: input.count || 10,
+      languageCode: project.language_code,
     });
 
     if (!result.success) {

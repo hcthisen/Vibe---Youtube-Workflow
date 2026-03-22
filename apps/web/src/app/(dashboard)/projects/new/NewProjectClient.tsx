@@ -3,13 +3,24 @@
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import {
+  PROJECT_LANGUAGE_OPTIONS,
+  normalizeProjectLanguageCode,
+} from "@/lib/project-language";
 
-export function NewProjectClient() {
+interface NewProjectClientProps {
+  defaultLanguageCode: string;
+}
+
+export function NewProjectClient({ defaultLanguageCode }: NewProjectClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const ideaId = searchParams.get("idea_id");
 
   const [title, setTitle] = useState("");
+  const [languageCode, setLanguageCode] = useState(
+    normalizeProjectLanguageCode(defaultLanguageCode)
+  );
   const [loading, setLoading] = useState(false);
   const [loadingIdea, setLoadingIdea] = useState(!!ideaId);
   const [error, setError] = useState<string | null>(null);
@@ -70,6 +81,7 @@ export function NewProjectClient() {
           body: JSON.stringify({
             idea_id: ideaId,
             title: title.trim(),
+            language_code: languageCode,
           }),
         });
 
@@ -94,6 +106,7 @@ export function NewProjectClient() {
           .from("projects") as any)
           .insert({
             user_id: user.id,
+            language_code: normalizeProjectLanguageCode(languageCode),
             title: title.trim(),
             status: "research",
           })
@@ -139,6 +152,27 @@ export function NewProjectClient() {
 
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">
+            Project Language
+          </label>
+          <select
+            value={languageCode}
+            onChange={(e) => setLanguageCode(normalizeProjectLanguageCode(e.target.value))}
+            className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors"
+          >
+            {PROJECT_LANGUAGE_OPTIONS.map((language) => (
+              <option key={language.code} value={language.code}>
+                {language.label}
+              </option>
+            ))}
+          </select>
+          <p className="mt-2 text-sm text-gray-500">
+            New outlines, title variants, descriptions, transcripts, and thumbnail text will use
+            this language.
+          </p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-2">
             Project Title
           </label>
           <input
@@ -171,5 +205,3 @@ export function NewProjectClient() {
     </div>
   );
 }
-
-

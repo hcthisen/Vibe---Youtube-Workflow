@@ -102,6 +102,7 @@ export const videoSubtitlesFetchOutputSchema = z.object({
 export const projectCreateFromIdeaInputSchema = z.object({
   idea_id: z.string().uuid(),
   title: z.string().min(1, "Title is required"),
+  language_code: z.enum(["en", "da", "es", "fr", "de"]).optional(),
 });
 
 export const projectCreateFromIdeaOutputSchema = z.object({
@@ -157,6 +158,7 @@ export const videoProcessPipelineInputSchema = z.object({
   silence_threshold_ms: z.number().default(500),
   retake_markers: z.array(z.string()).default([]),
   apply_intro_transition: z.boolean().default(false),
+  language_code: z.string().optional(),
 });
 
 export const videoProcessPipelineOutputSchema = z.object({
@@ -174,6 +176,7 @@ export const videoProcessPipelineOutputSchema = z.object({
 export const transcribeVideoInputSchema = z.object({
   job_id: z.string().uuid(),
   asset_id: z.string().uuid(),
+  language_code: z.string().optional(),
 });
 
 export const transcribeVideoOutputSchema = z.object({

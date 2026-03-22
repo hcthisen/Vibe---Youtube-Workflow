@@ -209,6 +209,7 @@ export interface Database {
           id: string;
           user_id: string;
           idea_id: string | null;
+          language_code: string;
           title: string;
           status: string;
           outline: Json | null;
@@ -222,6 +223,7 @@ export interface Database {
           id?: string;
           user_id: string;
           idea_id?: string | null;
+          language_code?: string;
           title: string;
           status?: string;
           outline?: Json | null;
@@ -235,6 +237,7 @@ export interface Database {
           id?: string;
           user_id?: string;
           idea_id?: string | null;
+          language_code?: string;
           title?: string;
           status?: string;
           outline?: Json | null;
@@ -436,4 +439,3 @@ export interface Database {
     CompositeTypes: Record<string, never>;
   };
 }
-

@@ -26,8 +26,9 @@ def extract_audio_for_transcription(video_path: str, audio_path: str):
 
 def transcribe_with_whisper(
     audio_path: str,
-    model_name: str = "base"
-) -> List[Dict]:
+    model_name: str = "base",
+    language: str | None = None,
+) -> dict:
     """
     Transcribe audio with Whisper to get word-level timestamps.
     
@@ -37,7 +38,11 @@ def transcribe_with_whisper(
 
     logger.info(f"Transcribing with Whisper ({model_name})...")
     model = whisper.load_model(model_name)
-    result = model.transcribe(audio_path, word_timestamps=True)
+    transcribe_kwargs = {"word_timestamps": True}
+    if language:
+        transcribe_kwargs["language"] = language
+
+    result = model.transcribe(audio_path, **transcribe_kwargs)
 
     words = []
     for segment in result.get("segments", []):
@@ -48,13 +53,19 @@ def transcribe_with_whisper(
                 "end": word_info["end"]
             })
 
+    detected_language = result.get("language", language or "unknown")
+
     logger.info(f"Transcribed {len(words)} words")
-    return words
+    return {
+        "words": words,
+        "language": detected_language,
+    }
 
 
 def transcribe_video(
     video_path: str,
-    model_name: str = "base"
+    model_name: str = "base",
+    language: str | None = None,
 ) -> dict:
     """
     Transcribe video using local Whisper model.
@@ -72,7 +83,8 @@ def transcribe_video(
         extract_audio_for_transcription(video_path, audio_path)
 
         # Transcribe
-        words = transcribe_with_whisper(audio_path, model_name)
+        transcription = transcribe_with_whisper(audio_path, model_name, language)
+        words = transcription["words"]
 
         # Generate plaintext version
         plaintext = " ".join([w["word"] for w in words])
@@ -81,6 +93,7 @@ def transcribe_video(
             "success": True,
             "words": words,
             "plaintext": plaintext,
+            "language": transcription["language"],
             "word_count": len(words)
         }
 
@@ -175,4 +188,3 @@ def search_transcript_for_phrases(
                 logger.info(f"Found '{phrase}' at {phrase_start:.2f}s")
 
     return matches
-

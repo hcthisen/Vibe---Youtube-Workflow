@@ -1,7 +1,26 @@
 import { Suspense } from "react";
+import { createClient } from "@/lib/supabase/server";
+import { normalizeProjectLanguageCode } from "@/lib/project-language";
 import { NewProjectClient } from "./NewProjectClient";
 
-export default function NewProjectPage() {
+export default async function NewProjectPage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  let defaultLanguageCode = "en";
+
+  if (user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("default_language_code")
+      .eq("id", user.id)
+      .single();
+
+    defaultLanguageCode = normalizeProjectLanguageCode(profile?.default_language_code);
+  }
+
   return (
     <Suspense
       fallback={
@@ -11,8 +30,7 @@ export default function NewProjectPage() {
         </div>
       }
     >
-      <NewProjectClient />
+      <NewProjectClient defaultLanguageCode={defaultLanguageCode} />
     </Suspense>
   );
 }
-
