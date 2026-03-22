@@ -262,7 +262,12 @@ export function ProfileForm({ profile, userId }: ProfileFormProps) {
             </label>
             <select
               value={formData.default_language_code}
-              onChange={(e) => setFormData({ ...formData, default_language_code: e.target.value })}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  default_language_code: normalizeProjectLanguageCode(e.target.value),
+                })
+              }
               className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors"
             >
               {PROJECT_LANGUAGE_OPTIONS.map((language) => (

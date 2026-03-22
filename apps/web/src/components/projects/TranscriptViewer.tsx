@@ -8,10 +8,7 @@ interface Asset {
   id: string;
   bucket: string;
   path: string;
-  metadata: {
-    language?: string;
-    requested_language?: string;
-  } | null;
+  metadata: unknown;
 }
 
 interface TranscriptSegment {
@@ -58,6 +55,11 @@ export function TranscriptViewer({ asset, projectId, initialDescription }: Trans
     setDescription(initialDescription || "");
     setDraftDescription(initialDescription || "");
   }, [initialDescription]);
+
+  const assetMetadata =
+    asset.metadata && typeof asset.metadata === "object" && !Array.isArray(asset.metadata)
+      ? (asset.metadata as { language?: string; requested_language?: string })
+      : null;
 
   const convertWordLevelToSegments = (
     words: WordLevelTranscript[],
@@ -108,7 +110,7 @@ export function TranscriptViewer({ asset, projectId, initialDescription }: Trans
           // Convert word-level format to segment format
           const converted = convertWordLevelToSegments(
             parsed,
-            asset.metadata?.language || asset.metadata?.requested_language || "en"
+            assetMetadata?.language || assetMetadata?.requested_language || "en"
           );
           setTranscript(converted);
         } else if (parsed.segments && parsed.full_text) {
