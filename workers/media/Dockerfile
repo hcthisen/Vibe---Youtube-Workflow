@@ -42,8 +42,11 @@ WORKDIR /app
 
 # Copy requirements first for better Docker layer caching
 COPY workers/media/requirements.txt ./workers/media/
+# `openai-whisper` still relies on `pkg_resources`, so avoid the newest setuptools
+# build-isolation toolchain and install with the worker env's pinned packaging tools.
+RUN pip install --no-cache-dir "setuptools<81" wheel
 # Use the PyTorch CPU wheels index to ensure torch/torchaudio resolve on slim images
-RUN pip install --no-cache-dir \
+RUN pip install --no-cache-dir --no-build-isolation \
     --extra-index-url https://download.pytorch.org/whl/cpu \
     -r workers/media/requirements.txt
 
