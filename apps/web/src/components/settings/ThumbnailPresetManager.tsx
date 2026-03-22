@@ -28,11 +28,30 @@ export function ThumbnailPresetManager({
   const supabase = createClient();
 
   const [uploading, setUploading] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [presetStyles, setPresetStyles] = useState<PresetStyle[]>(initialPresets);
+  const [youtubeUrl, setYouTubeUrl] = useState("");
 
   const canUploadMore = presetStyles.length < maxPresets;
+
+  const appendPreset = async (newPreset: PresetStyle) => {
+    const updatedPresets = [...presetStyles, newPreset];
+    const { error: updateError } = await supabase
+      .from("profiles")
+      .update({
+        thumbnail_preset_styles: updatedPresets,
+      } as any)
+      .eq("id", userId);
+
+    if (updateError) {
+      throw updateError;
+    }
+
+    setPresetStyles(updatedPresets);
+    router.refresh();
+  };
 
   const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -81,24 +100,13 @@ export function ThumbnailPresetManager({
         created_at: new Date().toISOString(),
       };
 
-      // Update profile with new preset
-      const updatedPresets = [...presetStyles, newPreset];
-
-      const { error: updateError } = await supabase
-        .from("profiles")
-        .update({
-          thumbnail_preset_styles: updatedPresets,
-        } as any)
-        .eq("id", userId);
-
-      if (updateError) {
+      try {
+        await appendPreset(newPreset);
+      } catch (updateError) {
         // Rollback storage upload
         await supabase.storage.from("thumbnail-preset-styles").remove([path]);
         throw updateError;
       }
-
-      setPresetStyles(updatedPresets);
-      router.refresh();
     } catch (err) {
       console.error("Upload error:", err);
       setError(err instanceof Error ? err.message : "Upload failed");
@@ -106,6 +114,46 @@ export function ThumbnailPresetManager({
       setUploading(false);
       // Reset file input
       event.target.value = "";
+    }
+  };
+
+  const handleImportFromYouTube = async () => {
+    if (!youtubeUrl.trim()) {
+      setError("Please enter a YouTube video URL");
+      return;
+    }
+
+    setImporting(true);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/thumbnail-presets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          youtube_url: youtubeUrl.trim(),
+          name: "YouTube thumbnail",
+        }),
+      });
+
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(payload?.error || "Import failed");
+      }
+
+      const preset = payload?.preset as PresetStyle | undefined;
+      if (!preset) {
+        throw new Error("Preset was created but the response was incomplete");
+      }
+
+      setPresetStyles((prev) => [...prev, preset]);
+      setYouTubeUrl("");
+      router.refresh();
+    } catch (err) {
+      console.error("YouTube import error:", err);
+      setError(err instanceof Error ? err.message : "Import failed");
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -178,50 +226,83 @@ export function ThumbnailPresetManager({
         </div>
       )}
 
-      {/* Upload Button */}
+      {/* Import Actions */}
       {canUploadMore && (
-        <div>
-          <label
-            htmlFor="preset-upload"
-            className={`inline-flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 disabled:bg-primary-600/50 text-white font-medium rounded-lg transition-colors cursor-pointer ${
-              uploading ? "opacity-50 cursor-not-allowed" : ""
-            }`}
-          >
-            {uploading ? (
-              <>
-                <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
-                Uploading...
-              </>
-            ) : (
-              <>
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 4v16m8-8H4"
-                  />
-                </svg>
-                Upload Preset Style
-              </>
-            )}
-          </label>
-          <input
-            id="preset-upload"
-            type="file"
-            accept="image/*"
-            onChange={handleUpload}
-            disabled={uploading}
-            className="hidden"
-          />
-          <p className="text-xs text-gray-500 mt-2">
-            {presetStyles.length} of {maxPresets} slots used
-          </p>
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <label
+              htmlFor="preset-upload"
+              className={`inline-flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 disabled:bg-primary-600/50 text-white font-medium rounded-lg transition-colors cursor-pointer ${
+                uploading ? "opacity-50 cursor-not-allowed" : ""
+              }`}
+            >
+              {uploading ? (
+                <>
+                  <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 4v16m8-8H4"
+                    />
+                  </svg>
+                  Upload Preset Style
+                </>
+              )}
+            </label>
+            <input
+              id="preset-upload"
+              type="file"
+              accept="image/*"
+              onChange={handleUpload}
+              disabled={uploading}
+              className="hidden"
+            />
+            <span className="text-xs text-gray-500">
+              {presetStyles.length} of {maxPresets} slots used
+            </span>
+          </div>
+
+          <div className="rounded-xl border border-gray-700 bg-gray-900/40 p-4">
+            <div className="flex flex-col gap-3 md:flex-row">
+              <input
+                type="url"
+                value={youtubeUrl}
+                onChange={(e) => setYouTubeUrl(e.target.value)}
+                placeholder="https://www.youtube.com/watch?v=..."
+                disabled={importing}
+                className="flex-1 px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors"
+              />
+              <button
+                type="button"
+                onClick={handleImportFromYouTube}
+                disabled={importing}
+                className="inline-flex items-center justify-center gap-2 px-4 py-3 bg-gray-800 hover:bg-gray-700 disabled:bg-gray-800/50 text-white font-medium rounded-lg transition-colors"
+              >
+                {importing ? (
+                  <>
+                    <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                    Importing...
+                  </>
+                ) : (
+                  "Import from YouTube Video"
+                )}
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-gray-500">
+              Paste a YouTube video link and the preset thumbnail will be extracted automatically.
+            </p>
+          </div>
         </div>
       )}
 
@@ -362,4 +443,3 @@ function PresetStyleCard({
     </div>
   );
 }
-

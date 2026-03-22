@@ -15,6 +15,7 @@ interface ProfileFormProps {
     silence_threshold_ms: number;
     retake_markers: unknown;
     intro_transition_enabled: boolean;
+    audio_target_lufs: number;
     default_language_code: string | null;
     default_location_code: number | null;
     retake_detection_enabled: boolean;
@@ -35,6 +36,7 @@ export function ProfileForm({ profile, userId }: ProfileFormProps) {
     silence_threshold_ms: profile?.silence_threshold_ms || 500,
     retake_markers: (profile?.retake_markers as string[])?.join(", ") || "",
     intro_transition_enabled: profile?.intro_transition_enabled || false,
+    audio_target_lufs: profile?.audio_target_lufs ?? -15.0,
     default_language_code: normalizeProjectLanguageCode(profile?.default_language_code || "da"),
     default_location_code: profile?.default_location_code || 2208,
     retake_detection_enabled: profile?.retake_detection_enabled || false,
@@ -61,6 +63,7 @@ export function ProfileForm({ profile, userId }: ProfileFormProps) {
       silence_threshold_ms: formData.silence_threshold_ms,
       retake_markers: retakeMarkers,
       intro_transition_enabled: formData.intro_transition_enabled,
+      audio_target_lufs: formData.audio_target_lufs,
       default_language_code: formData.default_language_code || null,
       default_location_code: formData.default_location_code || null,
       retake_detection_enabled: formData.retake_detection_enabled,
@@ -145,6 +148,30 @@ export function ProfileForm({ profile, userId }: ProfileFormProps) {
           <label htmlFor="retake_detection_enabled" className="text-sm text-gray-300">
             Enable intelligent retake detection (AI-powered)
           </label>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-2">
+            Audio Loudness Target (LUFS)
+          </label>
+          <input
+            type="number"
+            value={formData.audio_target_lufs}
+            onChange={(e) =>
+              setFormData({
+                ...formData,
+                audio_target_lufs: parseFloat(e.target.value) || -15.0,
+              })
+            }
+            className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors"
+            min={-20}
+            max={-10}
+            step={0.5}
+          />
+          <p className="mt-1 text-sm text-gray-500">
+            Controls processed video loudness. More negative values are quieter. Recommended:
+            -15.0 to -16.0 LUFS.
+          </p>
         </div>
 
         {/* Show retake settings only when enabled */}

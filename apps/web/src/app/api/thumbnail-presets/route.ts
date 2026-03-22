@@ -9,6 +9,33 @@ const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 const MAX_REDIRECTS = 3;
 const FETCH_TIMEOUT_MS = 15_000;
 
+function extractYouTubeVideoId(url: string): string | null {
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
+    /youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match && match[1]) {
+      return match[1];
+    }
+  }
+
+  return null;
+}
+
+function normalizePresetSourceUrl(url: string): string {
+  const trimmed = url.trim();
+  const videoId = extractYouTubeVideoId(trimmed);
+  if (!videoId) {
+    return trimmed;
+  }
+
+  // Prefer hqdefault for reliability. maxresdefault is not guaranteed to exist.
+  return `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+}
+
 function extFromContentType(contentType: string): string {
   if (contentType.includes("image/jpeg")) return "jpg";
   if (contentType.includes("image/png")) return "png";
@@ -93,10 +120,19 @@ async function fetchImageWithLimit(rawUrl: string, maxBytes: number): Promise<{
 
 export async function POST(request: NextRequest) {
   try {
-    const { image_url, name } = await request.json();
+    const { image_url, youtube_url, source_url, name } = await request.json();
+    const rawSourceUrl =
+      typeof source_url === "string"
+        ? source_url
+        : typeof youtube_url === "string"
+          ? youtube_url
+          : image_url;
 
-    if (!image_url || typeof image_url !== "string") {
-      return NextResponse.json({ error: "image_url is required" }, { status: 400 });
+    if (!rawSourceUrl || typeof rawSourceUrl !== "string") {
+      return NextResponse.json(
+        { error: "source_url, youtube_url, or image_url is required" },
+        { status: 400 }
+      );
     }
 
     const supabase = await createClient();
@@ -127,10 +163,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { buffer, contentType } = await fetchImageWithLimit(
-      image_url,
-      MAX_FILE_SIZE_BYTES
-    );
+    const normalizedSourceUrl = normalizePresetSourceUrl(rawSourceUrl);
+    const { buffer, contentType } = await fetchImageWithLimit(normalizedSourceUrl, MAX_FILE_SIZE_BYTES);
 
     const presetId = crypto.randomUUID();
     const timestamp = Date.now();
@@ -152,7 +186,12 @@ export async function POST(request: NextRequest) {
       id: presetId,
       bucket: "thumbnail-preset-styles",
       path,
-      name: typeof name === "string" && name.trim().length > 0 ? name.trim() : "Preset",
+      name:
+        typeof name === "string" && name.trim().length > 0
+          ? name.trim()
+          : extractYouTubeVideoId(rawSourceUrl)
+            ? "YouTube thumbnail"
+            : "Preset",
       created_at: new Date().toISOString(),
     };
 

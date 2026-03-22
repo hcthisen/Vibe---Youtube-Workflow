@@ -45,6 +45,11 @@ class VideoProcessHandler(BaseHandler):
             language_code = normalize_language_code(
                 input_data.get("language_code") or input_data.get("transcript_language")
             )
+            try:
+                audio_target_lufs = float(input_data.get("audio_target_lufs", DEFAULT_TARGET_LUFS))
+            except (TypeError, ValueError):
+                audio_target_lufs = DEFAULT_TARGET_LUFS
+            audio_target_lufs = max(-20.0, min(-10.0, audio_target_lufs))
             
             # Enhanced retake detection settings
             retake_context_window = input_data.get("retake_context_window_seconds", 30)
@@ -213,7 +218,7 @@ class VideoProcessHandler(BaseHandler):
                     current_video_path = final_output_path
 
                 # ===== STEP 5: Audio Loudness Normalization =====
-                logger.info("Step 5: Applying audio loudness normalization (-14 LUFS)")
+                logger.info(f"Step 5: Applying audio loudness normalization ({audio_target_lufs} LUFS)")
                 audio_normalization_applied = False
                 audio_normalization_status = "failed"
                 audio_normalization_note = None
@@ -221,7 +226,7 @@ class VideoProcessHandler(BaseHandler):
                 normalization_result = normalize_audio_loudness(
                     input_path=current_video_path,
                     output_path=normalized_output_path,
-                    target_lufs=DEFAULT_TARGET_LUFS,
+                    target_lufs=audio_target_lufs,
                     true_peak_db=DEFAULT_TRUE_PEAK,
                     lra=DEFAULT_LRA,
                 )
@@ -359,7 +364,7 @@ class VideoProcessHandler(BaseHandler):
                     } if retake_cuts else None,
                     "intro_transition_applied": intro_applied,
                     "audio_normalization": {
-                        "target_lufs": DEFAULT_TARGET_LUFS,
+                        "target_lufs": audio_target_lufs,
                         "true_peak_db": DEFAULT_TRUE_PEAK,
                         "loudness_range_lu": DEFAULT_LRA,
                         "status": audio_normalization_status,

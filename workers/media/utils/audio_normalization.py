@@ -7,7 +7,7 @@ import subprocess
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_TARGET_LUFS = -14.0
+DEFAULT_TARGET_LUFS = -15.0
 DEFAULT_TRUE_PEAK = -1.5
 DEFAULT_LRA = 11.0
 DEFAULT_AUDIO_BITRATE = "192k"

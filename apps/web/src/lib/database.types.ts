@@ -16,6 +16,7 @@ export interface Database {
           silence_threshold_ms: number;
           retake_markers: Json;
           intro_transition_enabled: boolean;
+          audio_target_lufs: number;
           default_language_code: string | null;
           default_location_code: number | null;
           retake_detection_enabled: boolean;
@@ -33,6 +34,7 @@ export interface Database {
           silence_threshold_ms?: number;
           retake_markers?: Json;
           intro_transition_enabled?: boolean;
+          audio_target_lufs?: number;
           default_language_code?: string | null;
           default_location_code?: number | null;
           retake_detection_enabled?: boolean;
@@ -50,6 +52,7 @@ export interface Database {
           silence_threshold_ms?: number;
           retake_markers?: Json;
           intro_transition_enabled?: boolean;
+          audio_target_lufs?: number;
           default_language_code?: string | null;
           default_location_code?: number | null;
           retake_detection_enabled?: boolean;

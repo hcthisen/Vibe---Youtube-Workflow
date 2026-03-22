@@ -61,7 +61,7 @@ export async function videoUploadFinalizeHandler(
     const { data: profileData } = await supabase
       .from("profiles")
       .select(
-        "silence_threshold_ms, retake_markers, intro_transition_enabled, " +
+        "silence_threshold_ms, retake_markers, intro_transition_enabled, audio_target_lufs, " +
         "retake_detection_enabled, retake_context_window_seconds, retake_min_confidence, " +
         "retake_prefer_sentence_boundaries"
       )
@@ -72,6 +72,7 @@ export async function videoUploadFinalizeHandler(
           silence_threshold_ms: number;
           retake_markers: unknown;
           intro_transition_enabled: boolean;
+          audio_target_lufs: number;
           retake_detection_enabled: boolean;
           retake_context_window_seconds: number;
           retake_min_confidence: number;
@@ -93,6 +94,7 @@ export async function videoUploadFinalizeHandler(
           retake_detection_enabled: profile?.retake_detection_enabled || false,
           retake_markers: (profile?.retake_markers as any) || [],
           apply_intro_transition: profile?.intro_transition_enabled || false,
+          audio_target_lufs: profile?.audio_target_lufs ?? -15.0,
           language_code: project.language_code,
           retake_context_window_seconds: profile?.retake_context_window_seconds || 30,
           retake_min_confidence: profile?.retake_min_confidence || 0.7,

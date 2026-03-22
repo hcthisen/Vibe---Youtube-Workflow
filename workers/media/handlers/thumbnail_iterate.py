@@ -222,6 +222,10 @@ TASK: Refine the thumbnail based on the following instructions:
 
 {refinement_prompt}
 
+If IMAGE 1 is provided, preserve IMAGE 1 as the exact person.
+Do NOT inherit glasses, facial hair, hairstyle, face shape, or other facial features from IMAGE 2 unless they are also present in IMAGE 1.
+Blend the face replacement with matching lighting, shadows, color, and texture so it looks natural and seamless.
+
 Video title context: "{title}"
 Any headline or overlaid text must be written in {language_name} ({language_code}).
 

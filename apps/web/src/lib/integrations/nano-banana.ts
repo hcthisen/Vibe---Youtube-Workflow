@@ -401,6 +401,11 @@ class NanoBananaClient {
 IMAGE 2: The thumbnail to edit.
 
 TASK: Replace the face in the thumbnail with ${userName}'s exact face from IMAGE 1.
+The final thumbnail must clearly look like IMAGE 1, because IMAGE 1 is the correct person.
+Treat this like a realistic face replacement, not a reinterpretation.
+Do NOT add, remove, or change facial features or accessories based on IMAGE 2.
+If the person in IMAGE 2 has glasses, different hair, different face shape, different nose, different eyes, or different facial hair, do NOT copy those traits unless they are also present in IMAGE 1.
+Match the lighting, color grading, shadows, sharpness, skin tone rendering, and compositing so the result looks natural and seamless, not like a crude pasted cutout.
 
 ${params.refinementPrompt}
 
@@ -435,6 +440,11 @@ When adding or modifying text on the thumbnail, ensure it aligns with the core c
 IMAGE 2: The thumbnail to edit.
 
 TASK: Replace ONLY the face in the thumbnail with ${userName}'s exact face from IMAGE 1.
+The final thumbnail must clearly look like IMAGE 1, because IMAGE 1 is the correct person.
+Treat this like a realistic face replacement, not a reinterpretation.
+Do NOT add, remove, or change facial features or accessories based on IMAGE 2.
+If the person in IMAGE 2 has glasses, different hair, different face shape, different nose, different eyes, or different facial hair, do NOT copy those traits unless they are also present in IMAGE 1.
+Match the lighting, color grading, shadows, sharpness, skin tone rendering, and compositing so the result looks natural and seamless, not like a crude pasted cutout.
 
 Keep the composition, background, colors, and layout identical to IMAGE 2.
 
