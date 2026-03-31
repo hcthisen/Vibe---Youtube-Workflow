@@ -4,6 +4,7 @@ import { useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import * as tus from "tus-js-client";
+import { MAX_VIDEO_FILE_SIZE_BYTES } from "@/lib/storage/constants";
 
 interface VideoUploaderProps {
   projectId: string;
@@ -18,6 +19,14 @@ export function VideoUploader({ projectId }: VideoUploaderProps) {
 
   const supabase = createClient();
 
+  const formatUploadError = useCallback((message: string) => {
+    if (/Maximum size exceeded/i.test(message)) {
+      return "Storage rejected this upload as too large. The app now auto-configures the raw video bucket for 2GB uploads; if this still happens on self-hosted Supabase, increase the storage service FILE_SIZE_LIMIT above 2GB and redeploy that stack.";
+    }
+
+    return message;
+  }, []);
+
   const handleUpload = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
@@ -30,7 +39,7 @@ export function VideoUploader({ projectId }: VideoUploaderProps) {
       }
 
       // Validate file size (2GB max)
-      if (file.size > 2 * 1024 * 1024 * 1024) {
+      if (file.size > MAX_VIDEO_FILE_SIZE_BYTES) {
         setError(`File size must be under 2GB. Your file is ${(file.size / 1024 / 1024 / 1024).toFixed(2)}GB`);
         return;
       }
@@ -57,27 +66,40 @@ export function VideoUploader({ projectId }: VideoUploaderProps) {
           throw new Error("No active session");
         }
 
-        const fileExt = file.name.split(".").pop();
-        const filePath = `${user.id}/${projectId}/${Date.now()}.${fileExt}`;
+        const prepareResponse = await fetch(`/api/projects/${projectId}/upload-target`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            filename: file.name,
+            contentType: file.type,
+            fileSize: file.size,
+          }),
+        });
 
-        // Get Supabase URL from environment
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-        if (!supabaseUrl) {
-          throw new Error("Supabase URL not configured");
+        const prepareResult = await prepareResponse.json().catch(() => null);
+
+        if (!prepareResponse.ok || !prepareResult?.success || !prepareResult?.data) {
+          throw new Error(prepareResult?.error || "Failed to prepare upload");
         }
+
+        const { bucketName, filePath, uploadUrl } = prepareResult.data as {
+          bucketName: string;
+          filePath: string;
+          uploadUrl: string;
+        };
 
         // Create TUS resumable upload
         const upload = new tus.Upload(file, {
-          endpoint: `${supabaseUrl}/storage/v1/upload/resumable`,
+          endpoint: uploadUrl,
           retryDelays: [0, 1000, 3000, 5000],
           headers: {
             authorization: `Bearer ${session.access_token}`,
             "x-upsert": "false",
           },
-          uploadDataDuringCreation: true,
+          uploadDataDuringCreation: false,
           removeFingerprintOnSuccess: true,
           metadata: {
-            bucketName: "project-raw-videos",
+            bucketName,
             objectName: filePath,
             contentType: file.type,
             cacheControl: "3600",
@@ -85,7 +107,7 @@ export function VideoUploader({ projectId }: VideoUploaderProps) {
           chunkSize: 6 * 1024 * 1024, // 6MB chunks
           onError: (error) => {
             console.error("Upload error:", error);
-            setError(error.message || "Upload failed");
+            setError(formatUploadError(error.message || "Upload failed"));
             setUploading(false);
           },
           onProgress: (bytesUploaded, bytesTotal) => {
@@ -125,11 +147,11 @@ export function VideoUploader({ projectId }: VideoUploaderProps) {
         upload.start();
       } catch (err) {
         console.error("Upload initialization error:", err);
-        setError(err instanceof Error ? err.message : "Upload failed");
+        setError(formatUploadError(err instanceof Error ? err.message : "Upload failed"));
         setUploading(false);
       }
     },
-    [projectId, supabase, router]
+    [formatUploadError, projectId, router, supabase]
   );
 
   return (

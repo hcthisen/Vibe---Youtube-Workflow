@@ -7,6 +7,22 @@
  */
 
 import { createClient } from "@supabase/supabase-js";
+import { config } from "dotenv";
+import { existsSync } from "fs";
+import { join } from "path";
+
+const envPaths = [
+  join(process.cwd(), ".env.local"),
+  join(process.cwd(), "apps", "web", ".env.local"),
+];
+
+for (const envPath of envPaths) {
+  if (existsSync(envPath)) {
+    console.log(`Loading environment from: ${envPath}`);
+    config({ path: envPath });
+    break;
+  }
+}
 
 const BUCKETS = [
   { name: "user-headshots", public: false, sizeLimit: 50 * 1024 * 1024 }, // 50MB
@@ -60,4 +76,3 @@ async function updateStorageBuckets() {
 }
 
 updateStorageBuckets();
-
