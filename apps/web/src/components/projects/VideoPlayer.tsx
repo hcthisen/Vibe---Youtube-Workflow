@@ -111,6 +111,9 @@ export function VideoPlayer({ rawAsset, processedAsset, projectId, hasFailedJob 
 
   const currentAsset = activeTab === "processed" ? processedAsset : rawAsset;
   const currentUrl = activeTab === "processed" ? processedUrl : rawUrl;
+  const currentDownloadHref = currentAsset
+    ? `/api/projects/${projectId}/assets/${currentAsset.id}/download`
+    : null;
 
   // Show re-process button if video has been processed or failed
   const showReprocessButton = (processedAsset || hasFailedJob) && rawAsset;
@@ -198,40 +201,52 @@ export function VideoPlayer({ rawAsset, processedAsset, projectId, hasFailedJob 
       {/* Video player or preview */}
       {!shouldLoadVideo ? (
         // Show preview with play button
-        <div className="relative aspect-video bg-gray-900 rounded-lg overflow-hidden group cursor-pointer" onClick={() => setShouldLoadVideo(true)}>
-          {/* Dark overlay */}
-          <div className="absolute inset-0 bg-black/40 flex items-center justify-center group-hover:bg-black/50 transition-colors">
-            {/* Play button */}
-            <div className="relative">
-              <div className="w-20 h-20 rounded-full bg-primary-500/90 group-hover:bg-primary-600 flex items-center justify-center transition-colors">
-                <svg
-                  className="w-10 h-10 text-white ml-1"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M8 5v14l11-7z" />
-                </svg>
+        <>
+          <div className="relative aspect-video bg-gray-900 rounded-lg overflow-hidden group cursor-pointer" onClick={() => setShouldLoadVideo(true)}>
+            {/* Dark overlay */}
+            <div className="absolute inset-0 bg-black/40 flex items-center justify-center group-hover:bg-black/50 transition-colors">
+              {/* Play button */}
+              <div className="relative">
+                <div className="w-20 h-20 rounded-full bg-primary-500/90 group-hover:bg-primary-600 flex items-center justify-center transition-colors">
+                  <svg
+                    className="w-10 h-10 text-white ml-1"
+                    fill="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                </div>
+                <div className="absolute inset-0 rounded-full bg-primary-500/20 animate-ping" />
               </div>
-              <div className="absolute inset-0 rounded-full bg-primary-500/20 animate-ping" />
+            </div>
+
+            {/* Video info overlay */}
+            <div className="absolute bottom-4 left-4 right-4 text-white">
+              <p className="text-sm font-medium">
+                {activeTab === "processed" ? "Processed Video" : "Original Video"}
+              </p>
+              {currentAsset &&
+              typeof currentAsset.metadata === "object" &&
+              currentAsset.metadata !== null &&
+              (currentAsset.metadata as any).original_duration_ms ? (
+                <p className="text-xs text-gray-300 mt-1">
+                  Duration: {Math.floor((currentAsset.metadata as any).original_duration_ms / 1000)}s
+                </p>
+              ) : null}
+              <p className="text-xs text-gray-400 mt-2">Click to load video</p>
             </div>
           </div>
-
-          {/* Video info overlay */}
-          <div className="absolute bottom-4 left-4 right-4 text-white">
-            <p className="text-sm font-medium">
-              {activeTab === "processed" ? "Processed Video" : "Original Video"}
-            </p>
-            {currentAsset &&
-            typeof currentAsset.metadata === "object" &&
-            currentAsset.metadata !== null &&
-            (currentAsset.metadata as any).original_duration_ms ? (
-              <p className="text-xs text-gray-300 mt-1">
-                Duration: {Math.floor((currentAsset.metadata as any).original_duration_ms / 1000)}s
-              </p>
-            ) : null}
-            <p className="text-xs text-gray-400 mt-2">Click to load video</p>
-          </div>
-        </div>
+          {currentDownloadHref ? (
+            <div className="flex items-center justify-between text-sm">
+              <a
+                href={currentDownloadHref}
+                className="text-primary-400 hover:text-primary-300 transition-colors"
+              >
+                Download {activeTab === "processed" ? "processed" : "original"} video
+              </a>
+            </div>
+          ) : null}
+        </>
       ) : currentUrl ? (
         // Show actual video player
         <>
@@ -247,13 +262,14 @@ export function VideoPlayer({ rawAsset, processedAsset, projectId, hasFailedJob 
 
           {/* Download button and metadata */}
           <div className="flex items-center justify-between text-sm">
-            <a
-              href={currentUrl}
-              download
-              className="text-primary-400 hover:text-primary-300 transition-colors"
-            >
-              Download {activeTab === "processed" ? "processed" : "original"} video
-            </a>
+            {currentDownloadHref ? (
+              <a
+                href={currentDownloadHref}
+                className="text-primary-400 hover:text-primary-300 transition-colors"
+              >
+                Download {activeTab === "processed" ? "processed" : "original"} video
+              </a>
+            ) : null}
 
             {currentAsset &&
             typeof currentAsset.metadata === "object" &&
@@ -276,4 +292,3 @@ export function VideoPlayer({ rawAsset, processedAsset, projectId, hasFailedJob 
     </div>
   );
 }
-

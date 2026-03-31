@@ -6,6 +6,7 @@ import {
   errorResponse,
   successResponse,
 } from "@/lib/api-auth";
+import { deriveAssetDownloadFilename } from "@/lib/storage/asset-download";
 
 /**
  * GET /api/v1/projects/[id]/assets/[asset_id]/download — Get a signed download URL
@@ -32,10 +33,14 @@ export async function GET(
 
     if (error || !asset) return errorResponse("Asset not found", 404);
 
+    const filename = deriveAssetDownloadFilename(asset);
+
     // Generate signed URL (valid for 1 hour)
     const { data: signedUrl, error: urlError } = await supabase.storage
       .from(asset.bucket)
-      .createSignedUrl(asset.path, 3600);
+      .createSignedUrl(asset.path, 3600, {
+        download: filename,
+      });
 
     if (urlError || !signedUrl) {
       return errorResponse("Failed to generate download URL", 500);
@@ -44,6 +49,7 @@ export async function GET(
     return successResponse({
       download_url: signedUrl.signedUrl,
       expires_in: 3600,
+      filename,
       type: asset.type,
       metadata: asset.metadata,
     });

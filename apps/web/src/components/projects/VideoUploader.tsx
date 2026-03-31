@@ -20,6 +20,10 @@ export function VideoUploader({ projectId }: VideoUploaderProps) {
   const supabase = createClient();
 
   const formatUploadError = useCallback((message: string) => {
+    if (/global file size limit is lower than 2gb/i.test(message)) {
+      return "The app bucket is set for 2GB, but the Supabase Storage server itself is capped lower. Raise the storage service FILE_SIZE_LIMIT above 2GB, redeploy that Supabase stack, and retry the upload.";
+    }
+
     if (/Maximum size exceeded/i.test(message)) {
       return "Storage rejected this upload as too large. The app now auto-configures the raw video bucket for 2GB uploads; if this still happens on self-hosted Supabase, increase the storage service FILE_SIZE_LIMIT above 2GB and redeploy that stack.";
     }

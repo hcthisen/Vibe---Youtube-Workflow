@@ -9,6 +9,14 @@ type BucketRecord = {
   allowedMimeTypes?: string[] | null;
 };
 
+function normalizeStorageLimitError(message: string): string {
+  if (/exceeded the maximum allowed size/i.test(message)) {
+    return "The storage backend global file size limit is lower than 2GB. Increase the Supabase Storage global limit first, then retry. On self-hosted Supabase this is the storage service FILE_SIZE_LIMIT setting.";
+  }
+
+  return message;
+}
+
 function readFileSizeLimit(bucket: BucketRecord): number {
   const rawValue = bucket.file_size_limit ?? bucket.fileSizeLimit ?? 0;
   return typeof rawValue === "string" ? Number(rawValue) : (rawValue ?? 0);
@@ -47,7 +55,9 @@ export async function ensureRawVideoBucketReady() {
     );
 
     if (createError && !/already exists/i.test(createError.message)) {
-      throw new Error(`Failed to create ${RAW_VIDEO_BUCKET}: ${createError.message}`);
+      throw new Error(
+        `Failed to create ${RAW_VIDEO_BUCKET}: ${normalizeStorageLimitError(createError.message)}`
+      );
     }
 
     return;
@@ -71,6 +81,8 @@ export async function ensureRawVideoBucketReady() {
   );
 
   if (updateError) {
-    throw new Error(`Failed to update ${RAW_VIDEO_BUCKET}: ${updateError.message}`);
+    throw new Error(
+      `Failed to update ${RAW_VIDEO_BUCKET}: ${normalizeStorageLimitError(updateError.message)}`
+    );
   }
 }
