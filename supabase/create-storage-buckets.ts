@@ -56,7 +56,7 @@ async function createStorageBuckets() {
   for (const bucket of BUCKETS) {
     const { data, error } = await supabase.storage.createBucket(bucket.name, {
       public: bucket.public,
-      fileSizeLimit: bucket.name.includes("video") ? 1024 * 1024 * 500 : 1024 * 1024 * 50, // 500MB for videos, 50MB for others
+      fileSizeLimit: bucket.name.includes("video") ? 2 * 1024 * 1024 * 1024 : 1024 * 1024 * 50, // 2GB for videos, 50MB for others
     });
 
     if (error) {

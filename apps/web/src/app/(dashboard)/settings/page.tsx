@@ -5,10 +5,12 @@ import { ProfileForm } from "@/components/settings/ProfileForm";
 import { HeadshotManager } from "@/components/settings/HeadshotManager";
 import { ThumbnailPresetManager } from "@/components/settings/ThumbnailPresetManager";
 import { ChannelBaseline } from "@/components/settings/ChannelBaseline";
+import { ApiKeyManager } from "@/components/settings/ApiKeyManager";
 
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
 type HeadshotRow = Database["public"]["Tables"]["headshots"]["Row"];
 type ChannelRow = Database["public"]["Tables"]["channels"]["Row"];
+type ApiKeyRow = Database["public"]["Tables"]["api_keys"]["Row"];
 
 export default async function SettingsPage({
   searchParams,
@@ -45,6 +47,13 @@ export default async function SettingsPage({
     .single();
   const channel = channelData as unknown as ChannelRow | null;
 
+  const { data: apiKeysData } = await supabase
+    .from("api_keys")
+    .select("id, key_prefix, name, last_used_at, created_at")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false });
+  const apiKeys = (apiKeysData as unknown as ApiKeyRow[] | null) ?? [];
+
   const params = await searchParams;
   const activeTab = params.tab || "profile";
 
@@ -53,6 +62,7 @@ export default async function SettingsPage({
     { id: "headshots", label: "Headshots" },
     { id: "thumbnail-presets", label: "Thumbnail Presets" },
     { id: "channel", label: "Channel Baseline" },
+    { id: "api-keys", label: "API Keys" },
   ];
 
   // Extract preset styles from profile (type relaxed for flexible schema)
@@ -117,6 +127,9 @@ export default async function SettingsPage({
             channel={channel}
             userId={user.id}
           />
+        )}
+        {activeTab === "api-keys" && (
+          <ApiKeyManager apiKeys={apiKeys} />
         )}
       </div>
     </div>

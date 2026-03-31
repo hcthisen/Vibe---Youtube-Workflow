@@ -10,8 +10,8 @@ import { createClient } from "@supabase/supabase-js";
 
 const BUCKETS = [
   { name: "user-headshots", public: false, sizeLimit: 50 * 1024 * 1024 }, // 50MB
-  { name: "project-raw-videos", public: false, sizeLimit: 500 * 1024 * 1024 }, // 500MB
-  { name: "project-processed-videos", public: false, sizeLimit: 500 * 1024 * 1024 }, // 500MB
+  { name: "project-raw-videos", public: false, sizeLimit: 2 * 1024 * 1024 * 1024 }, // 2GB
+  { name: "project-processed-videos", public: false, sizeLimit: 2 * 1024 * 1024 * 1024 }, // 2GB
   { name: "project-transcripts", public: false, sizeLimit: 50 * 1024 * 1024 }, // 50MB
   { name: "project-reports", public: false, sizeLimit: 50 * 1024 * 1024 }, // 50MB
   { name: "project-thumbnails", public: true, sizeLimit: 50 * 1024 * 1024 }, // 50MB
